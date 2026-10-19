@@ -59,6 +59,10 @@ class JobRecord:
         self.cancel_event = asyncio.Event()
         self.subscribers: list[asyncio.Queue[JobEvent | None]] = []
         self.task: asyncio.Task[None] | None = None
+        self.force_refresh = False
+        self.served_from_cache = False
+        self._cache_hits = 0
+        self._cache_misses = 0
 
     def to_response(self) -> JobResponse:
         return JobResponse(
@@ -74,6 +78,8 @@ class JobRecord:
             error=self.error,
             notes=list(self.notes),
             review_count=len(self.reviews),
+            served_from_cache=self.served_from_cache,
+            force_refresh=self.force_refresh,
         )
 
 
@@ -81,6 +87,34 @@ class JobManager:
     def __init__(self) -> None:
         self._jobs: dict[str, JobRecord] = {}
         self._lock = asyncio.Lock()
+
+    def would_fully_hit_cache(
+        self,
+        request: CreateJobRequest,
+        *,
+        app_ref_language: str | None = None,
+    ) -> bool:
+        """True if every requested country batch is already cached (12h TTL)."""
+        if request.force_refresh:
+            return False
+        try:
+            app_ref = parse_app_url(request.url)
+        except ParseError:
+            return False
+        settings = get_settings()
+        filters = request.filters
+        countries = filters.countries[: settings.max_countries_per_job]
+        lang = app_ref_language or app_ref.language or (
+            filters.languages[0] if filters.languages else "en"
+        )
+        cache = get_cache()
+        for country in countries:
+            if (
+                cache.get(app_ref.store, app_ref.app_id, country, lang, filters.sort)
+                is None
+            ):
+                return False
+        return bool(countries)
 
     async def create_job(self, request: CreateJobRequest) -> JobRecord:
         settings = get_settings()
@@ -103,6 +137,7 @@ class JobManager:
             filters=filters,
             raw_url=request.url,
         )
+        job.force_refresh = request.force_refresh
         if app_ref.store == Store.APP_STORE:
             job.notes.append(
                 JobLimitsNote(
@@ -118,7 +153,14 @@ class JobManager:
         async with self._lock:
             self._jobs[job.id] = job
 
-        job.task = asyncio.create_task(self._run_job(job, app_ref_country=app_ref.country, app_ref_language=app_ref.language))
+        job.task = asyncio.create_task(
+            self._run_job(
+                job,
+                app_ref_country=app_ref.country,
+                app_ref_language=app_ref.language,
+                force_refresh=request.force_refresh,
+            )
+        )
         return job
 
     def get(self, job_id: str) -> JobRecord | None:
@@ -170,6 +212,7 @@ class JobManager:
         *,
         app_ref_country: str | None,
         app_ref_language: str | None,
+        force_refresh: bool = False,
     ) -> None:
         from app.models import AppRef
 
@@ -208,14 +251,20 @@ class JobManager:
                 lang = app_ref_language or (
                     job.filters.languages[0] if job.filters.languages else "en"
                 )
-                cached = cache.get(
-                    job.store, job.app_id, country, lang, job.filters.sort
-                )
+                cached = None
+                if not force_refresh:
+                    cached = cache.get(
+                        job.store, job.app_id, country, lang, job.filters.sort
+                    )
                 country_reviews: list[Review]
                 if cached is not None:
                     country_reviews = cached
-                    job.progress.message = f"Cache hit for {country.upper()}"
+                    job._cache_hits += 1
+                    job.progress.message = (
+                        f"Cache hit for {country.upper()} (no store scrape)"
+                    )
                 else:
+                    job._cache_misses += 1
                     country_reviews = []
                     ref = AppRef(
                         store=job.store,
@@ -271,6 +320,30 @@ class JobManager:
                 if job.progress.matched >= job.filters.max_reviews:
                     break
 
+            job.served_from_cache = (
+                job._cache_hits > 0 and job._cache_misses == 0 and not force_refresh
+            )
+            if job.served_from_cache:
+                job.notes.append(
+                    JobLimitsNote(
+                        code="served_from_cache",
+                        message=(
+                            "Served from AppReviewr cache (12h). "
+                            "Google/Apple were not contacted for review pages. "
+                            "Use Refresh from store to scrape again."
+                        ),
+                    )
+                )
+            elif job._cache_hits and job._cache_misses:
+                job.notes.append(
+                    JobLimitsNote(
+                        code="partial_cache",
+                        message=(
+                            "Some countries came from cache; others were scraped fresh."
+                        ),
+                    )
+                )
+
             if job.cancel_event.is_set() or job.status == JobStatus.CANCELLED:
                 job.status = JobStatus.CANCELLED
                 job.reviews = dedupe_reviews(collected)[: job.filters.max_reviews]
@@ -278,7 +351,9 @@ class JobManager:
                 job.reviews = dedupe_reviews(collected)[: job.filters.max_reviews]
                 job.progress.matched = len(job.reviews)
                 job.status = JobStatus.COMPLETED
-                job.progress.message = "Done"
+                job.progress.message = (
+                    "Done (from cache)" if job.served_from_cache else "Done"
+                )
                 if job.store == Store.APP_STORE and not job.reviews:
                     job.notes.append(
                         JobLimitsNote(

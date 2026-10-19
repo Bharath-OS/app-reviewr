@@ -124,6 +124,8 @@ class JobFilters(BaseModel):
 class CreateJobRequest(BaseModel):
     url: str = Field(min_length=1)
     filters: JobFilters = Field(default_factory=JobFilters)
+    # When true, bypass the 12h review cache and scrape the store again.
+    force_refresh: bool = False
 
 
 class JobProgress(BaseModel):
@@ -152,6 +154,9 @@ class JobResponse(BaseModel):
     error: ErrorDetail | None = None
     notes: list[JobLimitsNote] = Field(default_factory=list)
     review_count: int = 0
+    # True when every country batch for this job came from the 12h cache (no store scrape).
+    served_from_cache: bool = False
+    force_refresh: bool = False
 
 
 class ReviewsPage(BaseModel):

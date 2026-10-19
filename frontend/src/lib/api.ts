@@ -50,6 +50,8 @@ export type JobResponse = {
   error?: { code: string; message: string } | null;
   notes: { code: string; message: string }[];
   review_count: number;
+  served_from_cache?: boolean;
+  force_refresh?: boolean;
 };
 
 export type Review = {
@@ -99,11 +101,16 @@ export async function fetchAppInfo(url: string): Promise<AppInfo> {
 export async function createJob(
   url: string,
   filters: JobFilters,
+  options?: { forceRefresh?: boolean },
 ): Promise<JobResponse> {
   const res = await fetch(`${API_URL}/api/jobs`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url, filters }),
+    body: JSON.stringify({
+      url,
+      filters,
+      force_refresh: options?.forceRefresh ?? false,
+    }),
   });
   return parseJson<JobResponse>(res);
 }
