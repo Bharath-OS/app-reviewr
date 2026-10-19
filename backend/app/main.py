@@ -6,17 +6,22 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
+from app.cache import get_cache
 from app.config import get_settings
 from app.models import ErrorDetail, ErrorResponse, HealthResponse
-from app.routes import app_info, health
+from app.rate_limit import limiter
+from app.routes import app_info, health, jobs
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     settings = get_settings()
     Path("data").mkdir(parents=True, exist_ok=True)
-    # Placeholder hook for DB/cache init in later milestones.
+    get_cache()
     yield
     del settings
 
@@ -28,6 +33,9 @@ def create_app() -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_middleware(SlowAPIMiddleware)
 
     app.add_middleware(
         CORSMiddleware,
@@ -39,6 +47,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router, prefix="/api")
     app.include_router(app_info.router, prefix="/api")
+    app.include_router(jobs.router, prefix="/api")
 
     @app.get("/", include_in_schema=False)
     async def root() -> HealthResponse:
