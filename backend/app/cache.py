@@ -1,4 +1,4 @@
-"""SQLite-backed review cache keyed by (store, app_id, country, lang, sort)."""
+"""SQLite-backed review cache keyed by (store, app_id, country, lang, sort, ratings)."""
 
 from __future__ import annotations
 
@@ -10,6 +10,17 @@ from threading import Lock
 
 from app.config import get_settings
 from app.models import Review, SortOption, Store
+
+
+def ratings_cache_key(ratings: list[int] | None) -> str:
+    """Stable cache segment for star filters.
+
+    - No rating filter → ``all`` (mixed scrape)
+    - Specific stars → e.g. ``1`` or ``2+3`` (sorted, deduped)
+    """
+    if not ratings:
+        return "all"
+    return "+".join(str(r) for r in sorted({int(r) for r in ratings}))
 
 
 class ReviewCache:
@@ -42,11 +53,21 @@ class ReviewCache:
                         country TEXT NOT NULL,
                         language TEXT NOT NULL,
                         sort TEXT NOT NULL,
+                        ratings_key TEXT NOT NULL DEFAULT 'all',
                         payload TEXT NOT NULL,
                         created_at TEXT NOT NULL
                     )
                     """
                 )
+                # Older DBs created before ratings_key existed.
+                cols = {
+                    row["name"]
+                    for row in conn.execute("PRAGMA table_info(review_cache)").fetchall()
+                }
+                if "ratings_key" not in cols:
+                    conn.execute(
+                        "ALTER TABLE review_cache ADD COLUMN ratings_key TEXT NOT NULL DEFAULT 'all'"
+                    )
                 conn.commit()
 
     @staticmethod
@@ -56,9 +77,16 @@ class ReviewCache:
         country: str,
         language: str,
         sort: SortOption | str,
+        ratings: list[int] | None = None,
+        *,
+        ratings_key: str | None = None,
     ) -> str:
         sort_val = sort.value if isinstance(sort, SortOption) else str(sort)
-        return f"{store.value}|{app_id}|{country.lower()}|{(language or 'en').lower()}|{sort_val}"
+        rk = ratings_key if ratings_key is not None else ratings_cache_key(ratings)
+        return (
+            f"{store.value}|{app_id}|{country.lower()}|"
+            f"{(language or 'en').lower()}|{sort_val}|{rk}"
+        )
 
     def get(
         self,
@@ -67,8 +95,13 @@ class ReviewCache:
         country: str,
         language: str,
         sort: SortOption | str,
+        ratings: list[int] | None = None,
+        *,
+        ratings_key: str | None = None,
     ) -> list[Review] | None:
-        key = self.make_key(store, app_id, country, language, sort)
+        key = self.make_key(
+            store, app_id, country, language, sort, ratings, ratings_key=ratings_key
+        )
         with self._lock:
             with self._connect() as conn:
                 row = conn.execute(
@@ -94,19 +127,28 @@ class ReviewCache:
         language: str,
         sort: SortOption | str,
         reviews: list[Review],
+        ratings: list[int] | None = None,
+        *,
+        ratings_key: str | None = None,
     ) -> None:
-        key = self.make_key(store, app_id, country, language, sort)
+        rk = ratings_key if ratings_key is not None else ratings_cache_key(ratings)
+        key = self.make_key(
+            store, app_id, country, language, sort, ratings, ratings_key=rk
+        )
         payload = json.dumps([r.model_dump(mode="json") for r in reviews])
         now = datetime.now(timezone.utc).isoformat()
+        sort_val = sort.value if isinstance(sort, SortOption) else str(sort)
         with self._lock:
             with self._connect() as conn:
                 conn.execute(
                     """
                     INSERT INTO review_cache
-                    (cache_key, store, app_id, country, language, sort, payload, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (cache_key, store, app_id, country, language, sort, ratings_key,
+                     payload, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(cache_key) DO UPDATE SET
                       payload=excluded.payload,
+                      ratings_key=excluded.ratings_key,
                       created_at=excluded.created_at
                     """,
                     (
@@ -115,7 +157,8 @@ class ReviewCache:
                         app_id,
                         country.lower(),
                         (language or "en").lower(),
-                        sort.value if isinstance(sort, SortOption) else str(sort),
+                        sort_val,
+                        rk,
                         payload,
                         now,
                     ),

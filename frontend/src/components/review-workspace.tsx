@@ -398,10 +398,13 @@ export function ReviewWorkspace({
           </p>
         )}
         <p className="text-xs text-muted-foreground">
-          First fetch scrapes the store and caches reviews for 12 hours. A second
-          Fetch for the same app/country/sort uses the cache (no Google/Apple
-          call). Use <span className="font-medium text-foreground">Refresh from store</span>{" "}
-          for a fresh scrape.
+          Fetches are cached for 12 hours per app, country, sort, and star
+          filter. No stars selected → mixed reviews are cached. Selecting 1★
+          (or 2★+3★, etc.) scrapes those ratings from the store and caches them
+          separately, so you do not get a thin slice of a previous mixed batch.
+          Same filters again → cache. Use{" "}
+          <span className="font-medium text-foreground">Refresh from store</span>{" "}
+          to scrape again.
         </p>
         {appError && (
           <p className="text-sm text-destructive" role="alert">

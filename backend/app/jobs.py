@@ -8,11 +8,12 @@ from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 from typing import Any
 
-from app.cache import get_cache
+from app.cache import get_cache, ratings_cache_key
 from app.config import get_settings
 from app.filters import dedupe_reviews, review_matches
 from app.models import (
     AppInfo,
+    AppRef,
     CreateJobRequest,
     ErrorDetail,
     JobEvent,
@@ -94,7 +95,7 @@ class JobManager:
         *,
         app_ref_language: str | None = None,
     ) -> bool:
-        """True if every requested country batch is already cached (12h TTL)."""
+        """True if every requested country×ratings batch is already cached (12h TTL)."""
         if request.force_refresh:
             return False
         try:
@@ -107,12 +108,21 @@ class JobManager:
         lang = app_ref_language or app_ref.language or (
             filters.languages[0] if filters.languages else "en"
         )
+        rk = ratings_cache_key(filters.ratings)
         cache = get_cache()
         for country in countries:
-            if (
-                cache.get(app_ref.store, app_ref.app_id, country, lang, filters.sort)
-                is None
-            ):
+            cached = cache.get(
+                app_ref.store,
+                app_ref.app_id,
+                country,
+                lang,
+                filters.sort,
+                ratings_key=rk,
+            )
+            if cached is None:
+                return False
+            # Thin bucket: previous fetch asked for fewer reviews than this job needs.
+            if len(cached) < filters.max_reviews:
                 return False
         return bool(countries)
 
@@ -214,8 +224,6 @@ class JobManager:
         app_ref_language: str | None,
         force_refresh: bool = False,
     ) -> None:
-        from app.models import AppRef
-
         job.status = JobStatus.RUNNING
         job.updated_at = _now()
         await self._publish(job, JobEvent(type="status", job=job.to_response(), message="started"))
@@ -223,6 +231,7 @@ class JobManager:
         source = get_source(job.store)
         cache = get_cache()
         settings = get_settings()
+        ratings_key = ratings_cache_key(job.filters.ratings)
         try:
             base_ref = AppRef(
                 store=job.store,
@@ -254,14 +263,23 @@ class JobManager:
                 cached = None
                 if not force_refresh:
                     cached = cache.get(
-                        job.store, job.app_id, country, lang, job.filters.sort
+                        job.store,
+                        job.app_id,
+                        country,
+                        lang,
+                        job.filters.sort,
+                        ratings_key=ratings_key,
                     )
+                    # Don't reuse a thinner previous fetch for a larger max_reviews.
+                    if cached is not None and len(cached) < job.filters.max_reviews:
+                        cached = None
                 country_reviews: list[Review]
                 if cached is not None:
                     country_reviews = cached
                     job._cache_hits += 1
                     job.progress.message = (
-                        f"Cache hit for {country.upper()} (no store scrape)"
+                        f"Cache hit for {country.upper()} "
+                        f"(ratings={ratings_key}, no store scrape)"
                     )
                 else:
                     job._cache_misses += 1
@@ -273,31 +291,58 @@ class JobManager:
                         language=lang,
                         raw_url=job.raw_url,
                     )
-                    async for review in source.iter_reviews(
-                        ref,
-                        sort=job.filters.sort.value,
-                        max_reviews=min(per_country_cap, settings.max_reviews_per_job),
-                        app_name=job.app_info.name if job.app_info else job.app_id,
-                        filter_score=(
-                            job.filters.ratings[0]
-                            if job.filters.ratings and len(job.filters.ratings) == 1
-                            else None
-                        ),
-                    ):
+                    app_name = job.app_info.name if job.app_info else job.app_id
+                    # Google Play supports per-star scrape (filter_score). Each
+                    # star selection gets its own cache bucket — never thin a
+                    # mixed "all" cache to satisfy a 1★-only request.
+                    # App Store has no star filter API; one pass + post-filter.
+                    score_passes: list[int | None]
+                    if job.store == Store.GOOGLE_PLAY and job.filters.ratings:
+                        score_passes = sorted({int(r) for r in job.filters.ratings})
+                    else:
+                        score_passes = [None]
+
+                    for score in score_passes:
                         if job.cancel_event.is_set():
                             break
-                        country_reviews.append(review)
-                        job.progress.fetched += 1
-                        if review_matches(review, job.filters):
-                            collected.append(review)
-                            job.progress.matched = len(dedupe_reviews(collected))
-                        if job.progress.fetched % 25 == 0:
+                        if job.progress.matched >= job.filters.max_reviews:
+                            break
+                        remaining = job.filters.max_reviews - len(
+                            dedupe_reviews(collected)
+                        )
+                        remaining = max(1, remaining)
+                        if score is not None:
+                            job.progress.message = (
+                                f"Fetching {country.upper()} · {score}★…"
+                            )
                             job.updated_at = _now()
                             await self._publish(
                                 job, JobEvent(type="progress", job=job.to_response())
                             )
-                        if job.progress.matched >= job.filters.max_reviews:
-                            break
+                        async for review in source.iter_reviews(
+                            ref,
+                            sort=job.filters.sort.value,
+                            max_reviews=min(
+                                remaining, per_country_cap, settings.max_reviews_per_job
+                            ),
+                            app_name=app_name,
+                            filter_score=score,
+                        ):
+                            if job.cancel_event.is_set():
+                                break
+                            country_reviews.append(review)
+                            job.progress.fetched += 1
+                            if review_matches(review, job.filters):
+                                collected.append(review)
+                                job.progress.matched = len(dedupe_reviews(collected))
+                            if job.progress.fetched % 25 == 0:
+                                job.updated_at = _now()
+                                await self._publish(
+                                    job,
+                                    JobEvent(type="progress", job=job.to_response()),
+                                )
+                            if job.progress.matched >= job.filters.max_reviews:
+                                break
                     if not job.cancel_event.is_set():
                         cache.set(
                             job.store,
@@ -306,6 +351,7 @@ class JobManager:
                             lang,
                             job.filters.sort,
                             country_reviews,
+                            ratings_key=ratings_key,
                         )
 
                 if cached is not None:
@@ -328,8 +374,10 @@ class JobManager:
                     JobLimitsNote(
                         code="served_from_cache",
                         message=(
-                            "Served from AppReviewr cache (12h). "
-                            "Google/Apple were not contacted for review pages. "
+                            "Served from AppReviewr cache (12h) for this "
+                            "app/country/sort/star-filter. Google/Apple were not "
+                            "contacted for review pages. Changing star ratings "
+                            "uses a separate cache bucket (or a fresh scrape). "
                             "Use Refresh from store to scrape again."
                         ),
                     )

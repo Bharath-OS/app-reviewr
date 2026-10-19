@@ -104,6 +104,123 @@ def test_create_job_invalid_url(client: TestClient) -> None:
     assert resp.json()["error"]["code"] == "host_not_allowed"
 
 
+def test_rating_filter_uses_separate_cache_and_scrape(client: TestClient) -> None:
+    """Mixed cache must not satisfy a later 1★-only request."""
+    info = AppInfo(
+        store=Store.GOOGLE_PLAY,
+        app_id="com.spotify.music",
+        name="Spotify",
+        developer="Spotify AB",
+        icon_url=None,
+        rating=4.5,
+        rating_count=10,
+        url=None,
+    )
+    mixed = _sample_reviews(10)  # ratings cycle 1..5
+    one_star = [
+        Review(
+            store=Store.GOOGLE_PLAY,
+            app_id="com.spotify.music",
+            app_name="Spotify",
+            review_id=f"one{i}",
+            author=f"One{i}",
+            rating=1,
+            title=None,
+            text=f"One star {i}",
+            date="2024-06-01T12:00:00Z",
+            country="US",
+            language="en",
+        )
+        for i in range(6)
+    ]
+    calls: list[int | None] = []
+
+    async def tracking_iter(*_a, **kwargs):
+        score = kwargs.get("filter_score")
+        calls.append(score)
+        items = one_star if score == 1 else mixed
+        async for item in _async_iter(items):
+            yield item
+
+    source = MagicMock()
+    source.get_app_info = AsyncMock(return_value=info)
+    source.iter_reviews = MagicMock(side_effect=lambda *a, **k: tracking_iter(*a, **k))
+    source.aclose = AsyncMock()
+
+    with patch("app.jobs.get_source", return_value=source):
+        # 1) Unfiltered mixed fetch → caches under ratings=all
+        first = client.post(
+            "/api/jobs",
+            json={
+                "url": "com.spotify.music",
+                "filters": {"countries": ["us"], "max_reviews": 10, "sort": "newest"},
+            },
+        )
+        assert first.status_code == 200
+        job1 = first.json()["id"]
+        for _ in range(40):
+            st = client.get(f"/api/jobs/{job1}").json()
+            if st["status"] == "completed":
+                break
+            import time
+
+            time.sleep(0.05)
+        assert calls == [None]
+
+        # 2) 1★ only → must scrape with filter_score=1 (not thin the mixed cache)
+        second = client.post(
+            "/api/jobs",
+            json={
+                "url": "com.spotify.music",
+                "filters": {
+                    "countries": ["us"],
+                    "max_reviews": 5,
+                    "sort": "newest",
+                    "ratings": [1],
+                },
+            },
+        )
+        assert second.status_code == 200
+        job2 = second.json()["id"]
+        for _ in range(40):
+            st = client.get(f"/api/jobs/{job2}").json()
+            if st["status"] in {"completed", "failed"}:
+                break
+            import time
+
+            time.sleep(0.05)
+        assert st["status"] == "completed"
+        assert calls == [None, 1]
+        assert st["served_from_cache"] is False
+        assert st["review_count"] == 5
+        assert all(r["rating"] == 1 for r in client.get(f"/api/jobs/{job2}/reviews").json()["reviews"])
+
+        # 3) Same 1★ filters again → cache hit, no third scrape
+        third = client.post(
+            "/api/jobs",
+            json={
+                "url": "com.spotify.music",
+                "filters": {
+                    "countries": ["us"],
+                    "max_reviews": 5,
+                    "sort": "newest",
+                    "ratings": [1],
+                },
+            },
+        )
+        job3 = third.json()["id"]
+        for _ in range(40):
+            st = client.get(f"/api/jobs/{job3}").json()
+            if st["status"] in {"completed", "failed"}:
+                break
+            import time
+
+            time.sleep(0.05)
+        assert st["status"] == "completed"
+        assert st["served_from_cache"] is True
+        assert calls == [None, 1]
+
+
 def test_second_fetch_uses_cache(client: TestClient) -> None:
     info = AppInfo(
         store=Store.GOOGLE_PLAY,
@@ -219,13 +336,43 @@ def test_cancel_job(client: TestClient) -> None:
 
 
 def test_cache_roundtrip(tmp_path) -> None:
-    from app.cache import ReviewCache
+    from app.cache import ReviewCache, ratings_cache_key
+
+    assert ratings_cache_key(None) == "all"
+    assert ratings_cache_key([3, 1, 1]) == "1+3"
     from app.models import SortOption
 
     cache = ReviewCache(db_path=tmp_path / "c.db")
     reviews = _sample_reviews(2)
-    cache.set(Store.GOOGLE_PLAY, "com.spotify.music", "us", "en", SortOption.NEWEST, reviews)
-    got = cache.get(Store.GOOGLE_PLAY, "com.spotify.music", "us", "en", SortOption.NEWEST)
+    cache.set(
+        Store.GOOGLE_PLAY,
+        "com.spotify.music",
+        "us",
+        "en",
+        SortOption.NEWEST,
+        reviews,
+        ratings_key="all",
+    )
+    got = cache.get(
+        Store.GOOGLE_PLAY,
+        "com.spotify.music",
+        "us",
+        "en",
+        SortOption.NEWEST,
+        ratings_key="all",
+    )
     assert got is not None
     assert len(got) == 2
     assert got[0].review_id == "r0"
+    # Different star bucket must not see the mixed payload.
+    assert (
+        cache.get(
+            Store.GOOGLE_PLAY,
+            "com.spotify.music",
+            "us",
+            "en",
+            SortOption.NEWEST,
+            ratings_key="1",
+        )
+        is None
+    )
