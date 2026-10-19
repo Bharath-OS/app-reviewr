@@ -151,6 +151,22 @@ test.describe("AppReviewr home (mocked API)", () => {
     ).toBeVisible();
   });
 
+  test("from/to date inputs cannot exceed today", async ({ page }) => {
+    await page.goto("/");
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    const todayIso = `${yyyy}-${mm}-${dd}`;
+
+    await expect(page.getByLabel("From date")).toHaveAttribute("max", todayIso);
+    await expect(page.getByLabel("To date")).toHaveAttribute("max", todayIso);
+
+    // Typed future dates should clamp to today.
+    await page.getByLabel("To date").fill("2099-12-31");
+    await expect(page.getByLabel("To date")).toHaveValue(todayIso);
+  });
+
   test("empty max reviews blocks fetch and shows error", async ({ page }) => {
     let jobsPosted = 0;
     await page.route("**/api/jobs", async (route) => {

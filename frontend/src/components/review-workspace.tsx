@@ -49,6 +49,23 @@ const DEFAULT_FILTERS: JobFilters = {
   max_reviews: 100,
 };
 
+/** Local calendar date as YYYY-MM-DD (for <input type="date" max>). */
+function localTodayIso(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Keep a date string on or before today (and optionally on or before `upper`). */
+function clampDateToToday(value: string, today: string, upper?: string | null): string | null {
+  if (!value) return null;
+  let next = value > today ? today : value;
+  if (upper && next > upper) next = upper;
+  return next;
+}
+
 const COUNTRY_OPTIONS = ["us", "gb", "ca", "au", "in", "de", "fr", "jp", "br", "mx"];
 
 function stars(n: number) {
@@ -66,6 +83,7 @@ export function ReviewWorkspace({
 }) {
   const [url, setUrl] = useState(initialUrl);
   const [filters, setFilters] = useState<JobFilters>(DEFAULT_FILTERS);
+  const today = localTodayIso();
   // Draft text so the user can clear the field while typing (don't force "1" on every keystroke).
   const [maxReviewsText, setMaxReviewsText] = useState(
     String(DEFAULT_FILTERS.max_reviews),
@@ -442,10 +460,20 @@ export function ReviewWorkspace({
             <Input
               id="from"
               type="date"
-              value={filters.date_from || ""}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, date_from: e.target.value || null }))
+              max={
+                filters.date_to && filters.date_to < today
+                  ? filters.date_to
+                  : today
               }
+              value={filters.date_from || ""}
+              onChange={(e) => {
+                const clamped = clampDateToToday(
+                  e.target.value,
+                  today,
+                  filters.date_to,
+                );
+                setFilters((f) => ({ ...f, date_from: clamped }));
+              }}
             />
           </div>
           <div className="space-y-2">
@@ -453,10 +481,20 @@ export function ReviewWorkspace({
             <Input
               id="to"
               type="date"
+              min={filters.date_from || undefined}
+              max={today}
               value={filters.date_to || ""}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, date_to: e.target.value || null }))
-              }
+              onChange={(e) => {
+                let clamped = clampDateToToday(e.target.value, today);
+                if (
+                  clamped &&
+                  filters.date_from &&
+                  clamped < filters.date_from
+                ) {
+                  clamped = filters.date_from;
+                }
+                setFilters((f) => ({ ...f, date_to: clamped }));
+              }}
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
