@@ -6,8 +6,8 @@
     "dev": "next dev --webpack -p 3741",
     "dev:turbo": "next dev --turbopack -p 3741",
     "build": "next build && npm run prepare:standalone",
-    "prepare:standalone": "mkdir -p .next/standalone/.next && cp -R public .next/standalone/public && cp -R .next/static .next/standalone/.next/static",
-    "start": "PORT=3741 HOSTNAME=0.0.0.0 node .next/standalone/server.js",
+    "prepare:standalone": "node scripts/prepare-standalone.mjs",
+    "start": "node scripts/start-standalone.mjs",
     "lint": "eslint"
   },
   "dependencies": {

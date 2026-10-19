@@ -97,13 +97,15 @@ npm run build
 npm run start
 ```
 
-**Option B — dev server (Webpack):**
+`build` / `start` use Node scripts that work on Windows, macOS, and Linux.
+
+**Option B — dev server (Webpack)** — simpler while developing; skips the production build:
 
 ```bash
 npm run dev
 ```
 
-Open http://127.0.0.1:3741 on **the same machine** where those commands are running.
+Open http://127.0.0.1:3741 (not `0.0.0.0`) on **the same machine** where those commands are running.
 
 > Note: Cloud Agent “Try Live” desktop is separate from your laptop’s localhost. Pasting `127.0.0.1:3741` into your own browser only works after you clone and run the app locally (steps above).
 ### Docker (optional)
