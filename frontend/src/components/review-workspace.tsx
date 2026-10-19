@@ -81,29 +81,43 @@ export function ReviewWorkspace({
   const pageSize = 25;
   const [busy, setBusy] = useState(false);
 
-  function commitMaxReviews(raw: string, { fallbackToOne }: { fallbackToOne: boolean }) {
+  function parseMaxReviews(raw: string): number | null {
     const trimmed = raw.trim();
-    if (trimmed === "") {
-      if (fallbackToOne) {
-        setMaxReviewsText("1");
-        setFilters((f) => ({ ...f, max_reviews: 1 }));
-        return 1;
-      }
-      return null;
-    }
+    if (trimmed === "") return null;
     const n = Number(trimmed);
-    if (!Number.isFinite(n) || n < 1) {
-      if (fallbackToOne) {
-        setMaxReviewsText("1");
-        setFilters((f) => ({ ...f, max_reviews: 1 }));
-        return 1;
-      }
-      return null;
+    if (!Number.isFinite(n)) return null;
+    return Math.floor(n);
+  }
+
+  function onMaxReviewsChange(raw: string) {
+    // Allow empty while typing; strip non-digits.
+    const cleaned = raw.replace(/[^\d]/g, "");
+    if (cleaned === "") {
+      setMaxReviewsText("");
+      return;
     }
-    const clamped = Math.min(2000, Math.floor(n));
+    const n = Number(cleaned);
+    if (n > 2000) {
+      setMaxReviewsText("2000");
+      setFilters((f) => ({ ...f, max_reviews: 2000 }));
+      return;
+    }
+    setMaxReviewsText(cleaned);
+    if (n >= 1) {
+      setFilters((f) => ({ ...f, max_reviews: n }));
+    }
+  }
+
+  function onMaxReviewsBlur() {
+    const n = parseMaxReviews(maxReviewsText);
+    if (n == null || n < 1) {
+      // Empty / invalid → show 0; Fetch will error instead of silently using 1.
+      setMaxReviewsText("0");
+      return;
+    }
+    const clamped = Math.min(2000, n);
     setMaxReviewsText(String(clamped));
     setFilters((f) => ({ ...f, max_reviews: clamped }));
-    return clamped;
   }
 
   const progressPct = useMemo(() => {
@@ -183,15 +197,16 @@ export function ReviewWorkspace({
       toast.error("Paste a store link first");
       return;
     }
-    if (maxReviewsText.trim() === "") {
-      toast.error("Max reviews is empty — enter a number between 1 and 2000.");
+    const parsedMax = parseMaxReviews(maxReviewsText);
+    if (parsedMax == null || parsedMax < 1) {
+      toast.error(
+        "Max reviews is empty or 0. Please enter a maximum review count (1–2000).",
+      );
       return;
     }
-    const maxReviews = commitMaxReviews(maxReviewsText, { fallbackToOne: false });
-    if (maxReviews == null) {
-      toast.error("Max reviews must be a number between 1 and 2000.");
-      return;
-    }
+    const maxReviews = Math.min(2000, parsedMax);
+    setMaxReviewsText(String(maxReviews));
+    setFilters((f) => ({ ...f, max_reviews: maxReviews }));
     setBusy(true);
     setReviews([]);
     setTotal(0);
@@ -403,17 +418,17 @@ export function ReviewWorkspace({
             <Label htmlFor="max">Max reviews</Label>
             <Input
               id="max"
-              type="number"
-              min={1}
-              max={2000}
+              type="text"
               inputMode="numeric"
+              pattern="[0-9]*"
               value={maxReviewsText}
-              onChange={(e) => setMaxReviewsText(e.target.value)}
-              onBlur={() =>
-                commitMaxReviews(maxReviewsText, { fallbackToOne: true })
-              }
+              onChange={(e) => onMaxReviewsChange(e.target.value)}
+              onBlur={onMaxReviewsBlur}
+              aria-describedby="max-reviews-hint"
             />
-            <p className="text-xs text-muted-foreground">1–2000. Empty is OK while typing; leave the field and it becomes 1.</p>
+            <p id="max-reviews-hint" className="text-xs text-muted-foreground">
+              1–2000. Values over 2000 cap at 2000. Empty/0 blocks Fetch with an error.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="from">From date</Label>
