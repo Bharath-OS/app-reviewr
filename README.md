@@ -115,12 +115,23 @@ See [`.env.example`](.env.example). Backend vars use the `APPREVIEW_` prefix.
 2. `development` — integration  
 3. `feature/*` off `development` — merge only when tests pass  
 
+## Caching
+
+Reviews are cached **12 hours** per `(store, app_id, country, language, sort)`.
+
+- First **Fetch reviews** scrapes the store and fills the cache.
+- A later Fetch for the same app/country/sort uses the cache (**no Google/Apple review scrape**).
+- **Refresh from store** forces a new scrape (`force_refresh: true`).
+- Fresh scrapes: **10/hour per visitor IP**. Fully cached re-fetches skip that scrape quota (still 30 API calls/minute).
+
+Set `NEXT_PUBLIC_SITE_URL` to your public domain for sitemap/robots/canonical SEO.
+
 ## Known limits (Phase 1)
 
 - **Honesty:** AppReviewr never claims “all reviews.” UI shows returned counts.
 - **App Store Tier 1:** Public iTunes RSS historically ~500 reviews/country. As of 2026-10 probes, RSS often returns an **empty feed** (HTTP 200, 0 entries) while lookup still works. Escalation documented; no silent paid tier.
-- **Google Play:** Depth depends on `google-play-scraper` pagination; jobs capped at `APPREVIEW_MAX_REVIEWS_PER_JOB` (default 2000).
-- **Rate limits:** Per-IP SlowAPI limits on API routes.
+- **Google Play:** Depth depends on `google-play-scraper` pagination; jobs capped at `APPREVIEW_MAX_REVIEWS_PER_JOB` (default 2000). Scrapes run from **your server IP**, not each visitor’s home IP (CDN only speeds the website).
+- **Rate limits:** Per-IP SlowAPI limits (see Caching).
 - **No auth / AI / payments** in Phase 1.
 
 ## Screenshots
