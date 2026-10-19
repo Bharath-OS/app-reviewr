@@ -82,11 +82,27 @@ export type ReviewsPage = {
 
 type ApiError = { error: { code: string; message: string } };
 
+export class ApiRequestError extends Error {
+  status: number;
+  code: string;
+
+  constructor(message: string, status: number, code = "request_failed") {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 async function parseJson<T>(res: Response): Promise<T> {
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = data as ApiError;
-    throw new Error(err.error?.message || `Request failed (${res.status})`);
+    throw new ApiRequestError(
+      err.error?.message || `Request failed (${res.status})`,
+      res.status,
+      err.error?.code || "request_failed",
+    );
   }
   return data as T;
 }

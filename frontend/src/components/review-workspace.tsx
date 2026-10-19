@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
+  ApiRequestError,
   cancelJob,
   createJob,
   exportUrl,
@@ -148,25 +149,69 @@ export function ReviewWorkspace({
   const jobStatus = job?.status;
 
   useEffect(() => {
-    if (!jobId || !jobStatus || !["queued", "running"].includes(jobStatus)) return;
-    const id = window.setInterval(async () => {
+    if (!jobId || !jobStatus || !["queued", "running"].includes(jobStatus)) {
+      return;
+    }
+    let cancelled = false;
+    let timer: number | undefined;
+    let rateLimitRetries = 0;
+
+    function markPollingFailed(message: string) {
+      setJob((prev) =>
+        prev && ["queued", "running"].includes(prev.status)
+          ? {
+              ...prev,
+              status: "failed",
+              error: { code: "polling_failed", message },
+              progress: {
+                ...prev.progress,
+                message: "Stopped — you can fetch again",
+              },
+            }
+          : prev,
+      );
+      setBusy(false);
+      toast.error(message);
+    }
+
+    async function tick() {
+      if (cancelled) return;
       try {
-        const next = await getJob(jobId);
+        const next = await getJob(jobId!);
+        if (cancelled) return;
+        rateLimitRetries = 0;
         setJob(next);
         if (["completed", "failed", "cancelled"].includes(next.status)) {
-          window.clearInterval(id);
+          setBusy(false);
           if (next.status === "completed") {
             toast.success(`Fetched ${next.review_count} reviews`);
           } else if (next.status === "failed") {
             toast.error(next.error?.message || "Fetch failed");
           }
+          return;
         }
+        timer = window.setTimeout(tick, 1500);
       } catch (err) {
-        window.clearInterval(id);
-        toast.error(err instanceof Error ? err.message : "Polling failed");
+        if (cancelled) return;
+        const status =
+          err instanceof ApiRequestError ? err.status : undefined;
+        const message =
+          err instanceof Error ? err.message : "Polling failed";
+        // Transient rate limits: back off a few times before unlocking the UI.
+        if (status === 429 && rateLimitRetries < 5) {
+          rateLimitRetries += 1;
+          timer = window.setTimeout(tick, 2000 * rateLimitRetries);
+          return;
+        }
+        markPollingFailed(message);
       }
-    }, 700);
-    return () => window.clearInterval(id);
+    }
+
+    timer = window.setTimeout(tick, 500);
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
   }, [jobId, jobStatus]);
 
   useEffect(() => {
@@ -236,6 +281,8 @@ export function ReviewWorkspace({
     setReviews([]);
     setTotal(0);
     setPage(1);
+    // Clear any previous job so a stuck "running" state cannot block the UI.
+    setJob(null);
     try {
       const payload: JobFilters = {
         ...filters,
@@ -250,9 +297,12 @@ export function ReviewWorkspace({
       if (forceRefresh) {
         toast.message("Refreshing from the store…");
       }
+      // Keep busy until the job leaves queued/running (poller clears it).
+      if (!["queued", "running"].includes(created.status)) {
+        setBusy(false);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not start job");
-    } finally {
       setBusy(false);
     }
   }
@@ -284,7 +334,8 @@ export function ReviewWorkspace({
     );
   }
 
-  const running = job?.status === "running" || job?.status === "queued";
+  const running =
+    busy || job?.status === "running" || job?.status === "queued";
   const canExport =
     job &&
     ["completed", "cancelled"].includes(job.status) &&
@@ -326,7 +377,7 @@ export function ReviewWorkspace({
             type="button"
             className="h-11"
             onClick={() => void onFetch(false)}
-            disabled={busy || running}
+            disabled={running}
           >
             {running ? "Fetching…" : "Fetch reviews"}
           </Button>
@@ -335,12 +386,17 @@ export function ReviewWorkspace({
             variant="outline"
             className="h-11"
             onClick={() => void onFetch(true)}
-            disabled={busy || running}
+            disabled={running}
             title="Bypass the 12-hour cache and scrape the store again"
           >
             Refresh from store
           </Button>
         </div>
+        {job?.status === "failed" && (
+          <p className="text-sm text-destructive" role="alert">
+            {job.error?.message || "Fetch failed. Adjust filters and try again."}
+          </p>
+        )}
         <p className="text-xs text-muted-foreground">
           First fetch scrapes the store and caches reviews for 12 hours. A second
           Fetch for the same app/country/sort uses the cache (no Google/Apple

@@ -69,8 +69,9 @@ async def create_job(request: Request, body: CreateJobRequest) -> JobResponse | 
 
 
 @router.get("/jobs/{job_id}", response_model=JobResponse)
-@limiter.limit("30/minute")
+@limiter.exempt
 async def get_job(request: Request, job_id: str) -> JobResponse | JSONResponse:
+    """Status polling must not share the 30/minute API quota (long jobs poll often)."""
     job = get_job_manager().get(job_id)
     if job is None:
         return _error(404, "job_not_found", "No job with that id.")
@@ -78,7 +79,7 @@ async def get_job(request: Request, job_id: str) -> JobResponse | JSONResponse:
 
 
 @router.get("/jobs/{job_id}/events", response_model=None)
-@limiter.limit("30/minute")
+@limiter.exempt
 async def job_events(request: Request, job_id: str):
     manager = get_job_manager()
     if manager.get(job_id) is None:
@@ -104,7 +105,7 @@ async def cancel_job(request: Request, job_id: str) -> JobResponse | JSONRespons
 
 
 @router.get("/jobs/{job_id}/reviews", response_model=ReviewsPage)
-@limiter.limit("30/minute")
+@limiter.exempt
 async def list_reviews(
     request: Request,
     job_id: str,
