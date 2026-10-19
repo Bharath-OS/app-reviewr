@@ -66,6 +66,10 @@ export function ReviewWorkspace({
 }) {
   const [url, setUrl] = useState(initialUrl);
   const [filters, setFilters] = useState<JobFilters>(DEFAULT_FILTERS);
+  // Draft text so the user can clear the field while typing (don't force "1" on every keystroke).
+  const [maxReviewsText, setMaxReviewsText] = useState(
+    String(DEFAULT_FILTERS.max_reviews),
+  );
   const [selectedRatings, setSelectedRatings] = useState<number[]>([]);
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [appLoading, setAppLoading] = useState(false);
@@ -76,6 +80,31 @@ export function ReviewWorkspace({
   const [total, setTotal] = useState(0);
   const pageSize = 25;
   const [busy, setBusy] = useState(false);
+
+  function commitMaxReviews(raw: string, { fallbackToOne }: { fallbackToOne: boolean }) {
+    const trimmed = raw.trim();
+    if (trimmed === "") {
+      if (fallbackToOne) {
+        setMaxReviewsText("1");
+        setFilters((f) => ({ ...f, max_reviews: 1 }));
+        return 1;
+      }
+      return null;
+    }
+    const n = Number(trimmed);
+    if (!Number.isFinite(n) || n < 1) {
+      if (fallbackToOne) {
+        setMaxReviewsText("1");
+        setFilters((f) => ({ ...f, max_reviews: 1 }));
+        return 1;
+      }
+      return null;
+    }
+    const clamped = Math.min(2000, Math.floor(n));
+    setMaxReviewsText(String(clamped));
+    setFilters((f) => ({ ...f, max_reviews: clamped }));
+    return clamped;
+  }
 
   const progressPct = useMemo(() => {
     if (!job) return 0;
@@ -154,6 +183,15 @@ export function ReviewWorkspace({
       toast.error("Paste a store link first");
       return;
     }
+    if (maxReviewsText.trim() === "") {
+      toast.error("Max reviews is empty — enter a number between 1 and 2000.");
+      return;
+    }
+    const maxReviews = commitMaxReviews(maxReviewsText, { fallbackToOne: false });
+    if (maxReviews == null) {
+      toast.error("Max reviews must be a number between 1 and 2000.");
+      return;
+    }
     setBusy(true);
     setReviews([]);
     setTotal(0);
@@ -161,6 +199,7 @@ export function ReviewWorkspace({
     try {
       const payload: JobFilters = {
         ...filters,
+        max_reviews: maxReviews,
         ratings: selectedRatings.length ? selectedRatings : null,
         countries: filters.countries.length ? filters.countries : ["us"],
         keyword: filters.keyword?.trim() || null,
@@ -367,14 +406,14 @@ export function ReviewWorkspace({
               type="number"
               min={1}
               max={2000}
-              value={filters.max_reviews}
-              onChange={(e) =>
-                setFilters((f) => ({
-                  ...f,
-                  max_reviews: Math.min(2000, Math.max(1, Number(e.target.value) || 1)),
-                }))
+              inputMode="numeric"
+              value={maxReviewsText}
+              onChange={(e) => setMaxReviewsText(e.target.value)}
+              onBlur={() =>
+                commitMaxReviews(maxReviewsText, { fallbackToOne: true })
               }
             />
+            <p className="text-xs text-muted-foreground">1–2000. Empty is OK while typing; leave the field and it becomes 1.</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="from">From date</Label>
