@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.models import ErrorDetail, ErrorResponse, HealthResponse
-from app.routes import health
+from app.routes import app_info, health
 
 
 @asynccontextmanager
@@ -38,6 +38,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health.router, prefix="/api")
+    app.include_router(app_info.router, prefix="/api")
 
     @app.get("/", include_in_schema=False)
     async def root() -> HealthResponse:
