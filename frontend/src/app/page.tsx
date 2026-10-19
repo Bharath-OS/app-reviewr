@@ -1,26 +1,33 @@
-import { ApiStatus } from "@/components/api-status";
+import { ReviewWorkspace } from "@/components/review-workspace";
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--accent-soft),_transparent_55%),linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)]">
-      <div className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-6 py-16">
-        <p className="text-sm font-semibold tracking-wide text-accent">
-          AppReviewr
-        </p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-          Download app reviews in seconds
-        </h1>
-        <p className="mt-4 max-w-xl text-lg text-muted">
-          Paste a Google Play or App Store link, fetch public reviews, filter
-          them, and export CSV, Excel, or JSON. No signup in Phase 1.
-        </p>
-        <div className="mt-8 flex flex-wrap items-center gap-3">
-          <span className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white">
-            Review fetch UI coming next
-          </span>
-          <ApiStatus />
+    <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
+      <ReviewWorkspace />
+      <section className="mt-16 space-y-4 border-t border-border pt-10">
+        <h2 className="text-xl font-semibold">FAQ</h2>
+        <div className="space-y-4 text-sm text-muted-foreground">
+          <div>
+            <h3 className="font-medium text-foreground">Do I need an account?</h3>
+            <p>No. Phase 1 is free to use with per-IP rate limits and job caps.</p>
+          </div>
+          <div>
+            <h3 className="font-medium text-foreground">
+              Will I get every review?
+            </h3>
+            <p>
+              No. Stores limit how many public reviews are available. AppReviewr
+              shows exactly how many were returned and never claims “all reviews.”
+            </p>
+          </div>
+          <div>
+            <h3 className="font-medium text-foreground">
+              What formats can I download?
+            </h3>
+            <p>CSV (Excel-friendly UTF-8 BOM), Excel (.xlsx), and JSON.</p>
+          </div>
         </div>
-      </div>
+      </section>
     </main>
   );
 }

@@ -45,3 +45,4 @@ dist/
 build/
 *.tsbuildinfo
 backend/.venv/
+frontend/.env.local
