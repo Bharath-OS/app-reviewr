@@ -44,25 +44,28 @@ Health: http://127.0.0.1:8741/api/health
 
 ### 3. Frontend (second terminal)
 
-Prefer production start for a reliable client bundle:
-
 ```bash
 cd frontend
 npm install
-cp ../.env.example ../.env   # or set NEXT_PUBLIC_API_URL
 echo "NEXT_PUBLIC_API_URL=http://127.0.0.1:8741" > .env.local
+```
+
+**Option A — production build (recommended):**
+
+```bash
 npm run build
 npm run start
 ```
 
-Dev mode (Webpack — more reliable than Turbopack in some environments):
+**Option B — dev server (Webpack):**
 
 ```bash
 npm run dev
 ```
 
-Open http://127.0.0.1:3741
+Open http://127.0.0.1:3741 on **the same machine** where those commands are running.
 
+> Note: Cloud Agent “Try Live” desktop is separate from your laptop’s localhost. Pasting `127.0.0.1:3741` into your own browser only works after you clone and run the app locally (steps above).
 ### Docker (optional)
 
 ```bash

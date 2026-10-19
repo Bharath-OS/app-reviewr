@@ -197,7 +197,15 @@ export function ReviewWorkspace({
       toast.error("Paste a store link first");
       return;
     }
-    const parsedMax = parseMaxReviews(maxReviewsText);
+    // Never allow empty/0 to fall through to a 1-review scrape.
+    const rawMax = maxReviewsText.trim();
+    if (rawMax === "" || rawMax === "0") {
+      toast.error(
+        "Max reviews is empty or 0. Please enter a maximum review count (1–2000).",
+      );
+      return;
+    }
+    const parsedMax = parseMaxReviews(rawMax);
     if (parsedMax == null || parsedMax < 1) {
       toast.error(
         "Max reviews is empty or 0. Please enter a maximum review count (1–2000).",
@@ -206,7 +214,6 @@ export function ReviewWorkspace({
     }
     const maxReviews = Math.min(2000, parsedMax);
     setMaxReviewsText(String(maxReviews));
-    setFilters((f) => ({ ...f, max_reviews: maxReviews }));
     setBusy(true);
     setReviews([]);
     setTotal(0);

@@ -150,4 +150,28 @@ test.describe("AppReviewr home (mocked API)", () => {
       page.getByRole("heading", { name: /Download App Store reviews/i }),
     ).toBeVisible();
   });
+
+  test("empty max reviews blocks fetch and shows error", async ({ page }) => {
+    let jobsPosted = 0;
+    await page.route("**/api/jobs", async (route) => {
+      if (route.request().method() === "POST") {
+        jobsPosted += 1;
+        await route.abort();
+        return;
+      }
+      await route.fallback();
+    });
+
+    await page.goto("/");
+    await page.getByLabel("App store URL").fill(
+      "https://play.google.com/store/apps/details?id=com.spotify.music",
+    );
+    await page.getByLabel(/Max reviews/i).fill("");
+    await page.getByRole("button", { name: "Fetch reviews" }).click();
+
+    await expect(
+      page.getByText(/Max reviews is empty or 0/i),
+    ).toBeVisible({ timeout: 5000 });
+    expect(jobsPosted).toBe(0);
+  });
 });
