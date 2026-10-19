@@ -230,7 +230,14 @@ export function ReviewWorkspace({
             className="h-11 flex-1"
             aria-label="App store URL"
           />
-          <Button type="button" variant="secondary" className="h-11" onClick={onPreview} disabled={appLoading}>
+          <Button
+            type="button"
+            variant="secondary"
+            className="h-11"
+            data-testid="preview-app"
+            onClick={onPreview}
+            disabled={appLoading}
+          >
             {appLoading ? "Looking up…" : "Preview app"}
           </Button>
           <Button type="button" className="h-11" onClick={onFetch} disabled={busy || running}>

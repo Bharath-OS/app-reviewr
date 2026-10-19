@@ -8,9 +8,10 @@ Paste a store link → fetch public reviews → filter → preview → download 
 
 | Layer | Tech |
 |---|---|
-| Frontend | Next.js (App Router), TypeScript, Tailwind |
+| Frontend | Next.js (App Router), TypeScript, Tailwind, shadcn/ui, TanStack Query |
 | Backend | FastAPI, Python 3.12, SQLite cache |
-| Data | Tier 1 free scrapers only (`google-play-scraper`, Apple iTunes RSS) |
+| Data | Tier 1 free scrapers only (`google-play-scraper`, Apple iTunes lookup + RSS) |
+| E2E | Playwright (`e2e/`) |
 
 ## Quick start (< 15 minutes)
 
@@ -18,7 +19,7 @@ Paste a store link → fetch public reviews → filter → preview → download 
 
 - Node.js 20+
 - Python 3.11+
-- Optional: Docker + Docker Compose
+- Optional: Docker Compose
 
 ### 1. Clone
 
@@ -39,17 +40,28 @@ pip install -r requirements-dev.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8741
 ```
 
-Health check: [http://127.0.0.1:8741/api/health](http://127.0.0.1:8741/api/health)
+Health: http://127.0.0.1:8741/api/health
 
 ### 3. Frontend (second terminal)
+
+Prefer production start for a reliable client bundle:
 
 ```bash
 cd frontend
 npm install
+cp ../.env.example ../.env   # or set NEXT_PUBLIC_API_URL
+echo "NEXT_PUBLIC_API_URL=http://127.0.0.1:8741" > .env.local
+npm run build
+npm run start
+```
+
+Dev mode (Webpack — more reliable than Turbopack in some environments):
+
+```bash
 npm run dev
 ```
 
-Open [http://127.0.0.1:3741](http://127.0.0.1:3741)
+Open http://127.0.0.1:3741
 
 ### Docker (optional)
 
@@ -57,50 +69,69 @@ Open [http://127.0.0.1:3741](http://127.0.0.1:3741)
 docker compose up --build
 ```
 
-- Frontend: http://127.0.0.1:3741  
-- Backend: http://127.0.0.1:8741  
-
 ## Tests
 
 ```bash
-cd backend
-source .venv/bin/activate
+# Backend unit/API
+cd backend && source .venv/bin/activate
+export PYTHONPATH=.
+export APPREVIEW_DISABLE_RATE_LIMIT=1
 pytest -q
+
+# Frontend lint/build
+cd frontend && npm run lint && npm run build
+
+# Playwright e2e (frontend + backend must be running)
+cd e2e && npm install && npx playwright install chromium && npm test
 ```
 
-Live store probes (skipped by default):
+Scraper health probe:
 
 ```bash
-pytest -q -m live
+cd backend && source .venv/bin/activate
+python scripts/healthcheck.py --api http://127.0.0.1:8741/api/health --scrapers
 ```
 
-API health script:
+## API
 
-```bash
-python scripts/healthcheck.py --api http://127.0.0.1:8741/api/health
-```
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/health` | Liveness |
+| GET | `/api/app-info?url=` | App preview card |
+| POST | `/api/jobs` | Start fetch job |
+| GET | `/api/jobs/{id}` | Job status |
+| GET | `/api/jobs/{id}/events` | SSE progress |
+| POST | `/api/jobs/{id}/cancel` | Cancel |
+| GET | `/api/jobs/{id}/reviews` | Paginated reviews |
+| GET | `/api/jobs/{id}/export?format=csv\|xlsx\|json` | Download |
 
 ## Environment
 
-See [`.env.example`](.env.example). All backend vars use the `APPREVIEW_` prefix.
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `APPREVIEW_CORS_ORIGINS` | `http://localhost:3741,...` | Allowed frontend origins |
-| `APPREVIEW_MAX_REVIEWS_PER_JOB` | `2000` | Hard cap per fetch job |
-| `NEXT_PUBLIC_API_URL` | `http://127.0.0.1:8741` | Frontend → API base URL |
+See [`.env.example`](.env.example). Backend vars use the `APPREVIEW_` prefix.
 
 ## Branching
 
-1. `main` — stable releases / docs  
+1. `main` — stable  
 2. `development` — integration  
 3. `feature/*` off `development` — merge only when tests pass  
 
 ## Known limits (Phase 1)
 
-- Tier 1 App Store RSS typically returns ~500 reviews per country.
-- Google Play depth depends on the public scraper library; UI will state returned counts honestly.
-- No auth, AI analysis, payments, or scheduled exports in Phase 1.
+- **Honesty:** AppReviewr never claims “all reviews.” UI shows returned counts.
+- **App Store Tier 1:** Public iTunes RSS historically ~500 reviews/country. As of 2026-10 probes, RSS often returns an **empty feed** (HTTP 200, 0 entries) while lookup still works. Escalation documented; no silent paid tier.
+- **Google Play:** Depth depends on `google-play-scraper` pagination; jobs capped at `APPREVIEW_MAX_REVIEWS_PER_JOB` (default 2000).
+- **Rate limits:** Per-IP SlowAPI limits on API routes.
+- **No auth / AI / payments** in Phase 1.
+
+## Screenshots
+
+See [`docs/screenshots/`](docs/screenshots/).
+
+## Deploy notes
+
+- Frontend: static/SSR Next.js app (Vercel-friendly). Set `NEXT_PUBLIC_API_URL` to the backend origin.
+- Backend: long-lived process (Uvicorn/container/VPS). Not serverless — jobs + SSE need a sticky process.
+- CORS: set `APPREVIEW_CORS_ORIGINS` to your frontend origin(s).
 
 ## License
 
