@@ -1,0 +1,73 @@
+{
+  "feed": {
+    "entry": [
+      {
+        "im:name": {
+          "label": "Spotify: Music and Podcasts"
+        },
+        "id": {
+          "label": "https://itunes.apple.com/us/app/spotify/id324684580",
+          "attributes": {
+            "im:id": "324684580"
+          }
+        }
+      },
+      {
+        "author": {
+          "name": {
+            "label": "TestUser"
+          }
+        },
+        "updated": {
+          "label": "2024-06-01T12:00:00-07:00"
+        },
+        "im:rating": {
+          "label": "5"
+        },
+        "im:version": {
+          "label": "8.9.0"
+        },
+        "id": {
+          "label": "1111111111"
+        },
+        "title": {
+          "label": "Love it"
+        },
+        "content": {
+          "label": "Great music streaming app with excellent playlists.",
+          "attributes": {
+            "type": "text"
+          }
+        }
+      },
+      {
+        "author": {
+          "name": {
+            "label": "AnotherUser"
+          }
+        },
+        "updated": {
+          "label": "2024-05-20T08:30:00-07:00"
+        },
+        "im:rating": {
+          "label": "2"
+        },
+        "im:version": {
+          "label": "8.8.0"
+        },
+        "id": {
+          "label": "2222222222"
+        },
+        "title": {
+          "label": "Bugs"
+        },
+        "content": {
+          "label": "Crashes sometimes when offline mode is enabled.",
+          "attributes": {
+            "type": "text"
+          }
+        }
+      }
+    ]
+  }
+}
