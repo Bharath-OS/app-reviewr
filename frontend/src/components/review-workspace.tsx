@@ -149,7 +149,7 @@ export function ReviewWorkspace({
     }
   }
 
-  async function onFetch() {
+  async function onFetch(forceRefresh = false) {
     if (!url.trim()) {
       toast.error("Paste a store link first");
       return;
@@ -165,9 +165,12 @@ export function ReviewWorkspace({
         countries: filters.countries.length ? filters.countries : ["us"],
         keyword: filters.keyword?.trim() || null,
       };
-      const created = await createJob(url.trim(), payload);
+      const created = await createJob(url.trim(), payload, { forceRefresh });
       setJob(created);
       if (!appInfo && created.app_info) setAppInfo(created.app_info);
+      if (forceRefresh) {
+        toast.message("Refreshing from the store…");
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not start job");
     } finally {
@@ -240,10 +243,31 @@ export function ReviewWorkspace({
           >
             {appLoading ? "Looking up…" : "Preview app"}
           </Button>
-          <Button type="button" className="h-11" onClick={onFetch} disabled={busy || running}>
+          <Button
+            type="button"
+            className="h-11"
+            onClick={() => void onFetch(false)}
+            disabled={busy || running}
+          >
             {running ? "Fetching…" : "Fetch reviews"}
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11"
+            onClick={() => void onFetch(true)}
+            disabled={busy || running}
+            title="Bypass the 12-hour cache and scrape the store again"
+          >
+            Refresh from store
+          </Button>
         </div>
+        <p className="text-xs text-muted-foreground">
+          First fetch scrapes the store and caches reviews for 12 hours. A second
+          Fetch for the same app/country/sort uses the cache (no Google/Apple
+          call). Use <span className="font-medium text-foreground">Refresh from store</span>{" "}
+          for a fresh scrape.
+        </p>
         {appError && (
           <p className="text-sm text-destructive" role="alert">
             {appError}
@@ -449,8 +473,18 @@ export function ReviewWorkspace({
             )}
           </div>
           <Progress value={progressPct} />
+          {job.served_from_cache && (
+            <Badge variant="secondary">Served from 12h cache</Badge>
+          )}
           {job.notes?.map((n) => (
-            <p key={n.code} className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
+            <p
+              key={n.code}
+              className={`text-sm rounded-md border px-3 py-2 ${
+                n.code === "served_from_cache"
+                  ? "border-emerald-100 bg-emerald-50 text-emerald-900"
+                  : "border-amber-100 bg-amber-50 text-amber-800"
+              }`}
+            >
               {n.message}
             </p>
           ))}

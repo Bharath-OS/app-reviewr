@@ -101,7 +101,65 @@ def test_create_job_and_complete(client: TestClient) -> None:
 def test_create_job_invalid_url(client: TestClient) -> None:
     resp = client.post("/api/jobs", json={"url": "https://evil.example/x"})
     assert resp.status_code == 400
-    assert resp.json()["error"]["code"] == "invalid_request"
+    assert resp.json()["error"]["code"] == "host_not_allowed"
+
+
+def test_second_fetch_uses_cache(client: TestClient) -> None:
+    info = AppInfo(
+        store=Store.GOOGLE_PLAY,
+        app_id="com.spotify.music",
+        name="Spotify",
+        developer="Spotify AB",
+        icon_url=None,
+        rating=4.5,
+        rating_count=10,
+        url=None,
+    )
+    reviews = _sample_reviews(4)
+    calls = {"n": 0}
+
+    async def tracking_iter(*_a, **_k):
+        calls["n"] += 1
+        async for item in _async_iter(reviews):
+            yield item
+
+    source = MagicMock()
+    source.get_app_info = AsyncMock(return_value=info)
+    source.iter_reviews = MagicMock(side_effect=lambda *a, **k: tracking_iter())
+    source.aclose = AsyncMock()
+
+    body = {
+        "url": "com.spotify.music",
+        "filters": {"countries": ["us"], "max_reviews": 4, "sort": "newest"},
+    }
+
+    with patch("app.jobs.get_source", return_value=source):
+        first = client.post("/api/jobs", json=body)
+        assert first.status_code == 200
+        job1 = first.json()["id"]
+        for _ in range(40):
+            st = client.get(f"/api/jobs/{job1}").json()
+            if st["status"] == "completed":
+                break
+            import time
+
+            time.sleep(0.05)
+        assert calls["n"] == 1
+
+        second = client.post("/api/jobs", json=body)
+        assert second.status_code == 200
+        job2 = second.json()["id"]
+        for _ in range(40):
+            st = client.get(f"/api/jobs/{job2}").json()
+            if st["status"] in {"completed", "failed"}:
+                break
+            import time
+
+            time.sleep(0.05)
+        assert st["status"] == "completed"
+        assert st["served_from_cache"] is True
+        assert calls["n"] == 1  # scraper not called again
+        assert any(n["code"] == "served_from_cache" for n in st["notes"])
 
 
 def test_job_not_found(client: TestClient) -> None:

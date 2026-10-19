@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
+from limits import parse
+from slowapi.util import get_remote_address
 from sse_starlette.sse import EventSourceResponse
 
 from app.jobs import get_job_manager
@@ -15,8 +17,11 @@ from app.models import (
     ReviewsPage,
 )
 from app.rate_limit import limiter
+from app.url_parser import ParseError, parse_app_url
 
 router = APIRouter(tags=["jobs"])
+
+_SCRAPE_LIMIT = parse("10/hour")
 
 
 def _error(status: int, code: str, message: str) -> JSONResponse:
@@ -27,9 +32,35 @@ def _error(status: int, code: str, message: str) -> JSONResponse:
 
 
 @router.post("/jobs", response_model=JobResponse)
-@limiter.limit("10/hour")
+@limiter.limit("30/minute")
 async def create_job(request: Request, body: CreateJobRequest) -> JobResponse | JSONResponse:
+    """Start a fetch job.
+
+    Fresh store scrapes are limited to 10/hour per IP.
+    Fully cached re-fetches (within 12h) skip that scrape quota.
+    """
     manager = get_job_manager()
+
+    try:
+        app_ref = parse_app_url(body.url)
+    except ParseError as exc:
+        return _error(400, exc.code, exc.message)
+
+    cacheable = manager.would_fully_hit_cache(
+        body, app_ref_language=app_ref.language
+    )
+    if not cacheable and limiter.enabled:
+        ip_key = get_remote_address(request)
+        if not limiter.limiter.test(_SCRAPE_LIMIT, ip_key):
+            return _error(
+                429,
+                "rate_limited",
+                "Fresh scrape limit reached for your IP (10/hour). "
+                "Re-fetching the same app from cache (12h) still works, "
+                "or try again later.",
+            )
+        limiter.limiter.hit(_SCRAPE_LIMIT, ip_key)
+
     try:
         job = await manager.create_job(body)
     except ValueError as exc:
