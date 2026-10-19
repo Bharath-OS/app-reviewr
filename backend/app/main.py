@@ -14,7 +14,7 @@ from app.cache import get_cache
 from app.config import get_settings
 from app.models import ErrorDetail, ErrorResponse, HealthResponse
 from app.rate_limit import limiter
-from app.routes import app_info, health, jobs
+from app.routes import app_info, export, health, jobs
 
 
 @asynccontextmanager
@@ -48,6 +48,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix="/api")
     app.include_router(app_info.router, prefix="/api")
     app.include_router(jobs.router, prefix="/api")
+    app.include_router(export.router, prefix="/api")
 
     @app.get("/", include_in_schema=False)
     async def root() -> HealthResponse:
