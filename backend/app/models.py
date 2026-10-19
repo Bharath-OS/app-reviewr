@@ -1,14 +1,35 @@
 """Pydantic models and shared enums for AppReviewr."""
 
+from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class Store(str, Enum):
     GOOGLE_PLAY = "google_play"
     APP_STORE = "app_store"
+
+
+class JobStatus(str, Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class SortOption(str, Enum):
+    NEWEST = "newest"
+    MOST_RELEVANT = "most_relevant"
+    RATING = "rating"
+
+
+class ExportFormat(str, Enum):
+    CSV = "csv"
+    XLSX = "xlsx"
+    JSON = "json"
 
 
 class HealthResponse(BaseModel):
@@ -35,7 +56,6 @@ class AppRef(BaseModel):
     raw_url: str | None = None
 
 
-# Placeholder shapes used by later milestones (kept for scaffold imports).
 class AppInfo(BaseModel):
     store: Store
     app_id: str
@@ -63,3 +83,86 @@ class Review(BaseModel):
     reply_date: str | None = None
     country: str
     language: str | None = None
+
+
+class JobFilters(BaseModel):
+    ratings: list[int] | None = None
+    countries: list[str] = Field(default_factory=lambda: ["us"])
+    languages: list[str] | None = None
+    date_from: str | None = None
+    date_to: str | None = None
+    keyword: str | None = None
+    has_developer_reply: bool | None = None
+    sort: SortOption = SortOption.NEWEST
+    max_reviews: int = Field(default=200, ge=1, le=2000)
+
+    @field_validator("ratings")
+    @classmethod
+    def validate_ratings(cls, value: list[int] | None) -> list[int] | None:
+        if value is None:
+            return value
+        cleaned = sorted({int(v) for v in value if 1 <= int(v) <= 5})
+        return cleaned or None
+
+    @field_validator("countries")
+    @classmethod
+    def validate_countries(cls, value: list[str]) -> list[str]:
+        cleaned = [c.strip().lower() for c in value if c and c.strip()]
+        if not cleaned:
+            return ["us"]
+        return cleaned
+
+    @field_validator("languages")
+    @classmethod
+    def validate_languages(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        cleaned = [c.strip().lower() for c in value if c and c.strip()]
+        return cleaned or None
+
+
+class CreateJobRequest(BaseModel):
+    url: str = Field(min_length=1)
+    filters: JobFilters = Field(default_factory=JobFilters)
+
+
+class JobProgress(BaseModel):
+    fetched: int = 0
+    matched: int = 0
+    target: int | None = None
+    current_country: str | None = None
+    message: str | None = None
+
+
+class JobLimitsNote(BaseModel):
+    code: str
+    message: str
+
+
+class JobResponse(BaseModel):
+    id: str
+    status: JobStatus
+    store: Store
+    app_id: str
+    app_info: AppInfo | None = None
+    filters: JobFilters
+    progress: JobProgress
+    created_at: datetime
+    updated_at: datetime
+    error: ErrorDetail | None = None
+    notes: list[JobLimitsNote] = Field(default_factory=list)
+    review_count: int = 0
+
+
+class ReviewsPage(BaseModel):
+    job_id: str
+    total: int
+    page: int
+    page_size: int
+    reviews: list[Review]
+
+
+class JobEvent(BaseModel):
+    type: Literal["progress", "status", "error", "done"]
+    job: JobResponse | None = None
+    message: str | None = None
