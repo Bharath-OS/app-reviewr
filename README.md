@@ -32,23 +32,63 @@ cp .env.example .env
 
 ### 2. Backend
 
+**macOS / Linux**
+
 ```bash
 cd backend
 python3 -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 pip install -r requirements-dev.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8741
 ```
 
-Health: http://127.0.0.1:8741/api/health
+**Windows (Command Prompt)**
+
+On Windows, use `python` (not `python3`) and `Scripts\activate` (not `source …/bin/activate`):
+
+```bat
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements-dev.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8741
+```
+
+**Windows (PowerShell)** — same as above, but activate with:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+If PowerShell blocks the script, run once: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
+
+Leave this terminal open while the API is running.
+
+**Open the API in a browser**
+
+`--host 0.0.0.0` only means “listen on all interfaces.” Do **not** open `http://0.0.0.0:8741` in the browser.
+
+Use:
+
+- Health check: http://127.0.0.1:8741/api/health  
+- Or: http://localhost:8741/api/health  
+
+You should see JSON like `{"status":"ok","service":"AppReviewr",...}`. The site UI is the frontend on port **3741**, not this URL.
 
 ### 3. Frontend (second terminal)
 
 ```bash
 cd frontend
 npm install
-echo "NEXT_PUBLIC_API_URL=http://127.0.0.1:8741" > .env.local
 ```
+
+Create `frontend/.env.local` with:
+
+```
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8741
+```
+
+(On Windows CMD you can run: `echo NEXT_PUBLIC_API_URL=http://127.0.0.1:8741> .env.local`)
 
 **Option A — production build (recommended):**
 
@@ -75,10 +115,16 @@ docker compose up --build
 ## Tests
 
 ```bash
-# Backend unit/API
+# Backend unit/API (macOS/Linux)
 cd backend && source .venv/bin/activate
 export PYTHONPATH=.
 export APPREVIEW_DISABLE_RATE_LIMIT=1
+pytest -q
+
+# Backend unit/API (Windows CMD)
+cd backend && .venv\Scripts\activate
+set PYTHONPATH=.
+set APPREVIEW_DISABLE_RATE_LIMIT=1
 pytest -q
 
 # Frontend lint/build
