@@ -213,56 +213,25 @@ Reviews are cached **12 hours** per `(store, app_id, country, language, sort, st
 
 Set `NEXT_PUBLIC_SITE_URL` to your public domain for sitemap/robots/canonical SEO.
 
-## App Store waitlist (Google Form → Sheet)
+## App Store waitlist (Apps Script → Sheet)
 
-Nav **App Store** goes to `/app-store-waitlist`. The page shows a **native** Name / Email form (no embedded Google Form). Submit POSTs into your Google Form’s `formResponse` endpoint, so rows appear in the Form responses / linked Sheet. No app database.
+Nav **App Store** → `/app-store-waitlist`. Native form (Name, Email, optional “What do you need App Store reviews for?”) posts to **`POST /api/waitlist`**, which forwards to your **Google Apps Script** web app; the script appends a row to a Sheet. No app database.
 
-### 1. Create the Form
+**Why Apps Script (not Google Form `formResponse`)?** Real JSON ok/error, no hidden iframe, and the deploy URL stays server-side (`APPS_SCRIPT_WAITLIST_URL`) instead of in the browser bundle.
 
-1. Open [Google Forms](https://forms.google.com).
-2. Add questions: **Name** (short answer), **Email** (short answer), optional **Message**.
-3. (Optional) Responses → Link to Sheets.
+Full copy-paste script + deploy steps: [`docs/app-store-waitlist-apps-script.md`](docs/app-store-waitlist-apps-script.md).
 
-### 2. Get the action URL
+Quick path:
 
-The submit URL is:
-
-```
-https://docs.google.com/forms/d/e/FORM_ID/formResponse
-```
-
-`FORM_ID` is the same id as in your normal share link (`…/forms/d/e/FORM_ID/viewform`). Replace `viewform` with `formResponse`.
-
-### 3. Get `entry.xxxxx` field IDs
-
-**Prefill link (easiest):**
-
-1. Form menu **⋮** → **Get pre-filled link**.
-2. Type sample values → **Get link** → copy the URL.
-3. From the URL, copy each `entry.1234567890` (Name → `NEXT_PUBLIC_GOOGLE_FORM_ENTRY_NAME`, Email → `…_ENTRY_EMAIL`).
-
-**Or Inspect:**
-
-1. Open the live form (`viewform`).
-2. Right-click the Name input → **Inspect**.
-3. Find `name="entry.XXXXXXXX"` on the `<input>` / `<textarea>`.
-
-### 4. Configure env and restart
-
-In `frontend/.env.local` (and production):
+1. Create a Sheet with tab `Waitlist` and headers `Timestamp | Name | Email | Need`.
+2. **Extensions → Apps Script** → paste the script from the doc → **Deploy → Web app** (Execute as **Me**, Who has access **Anyone**) → copy the `/exec` URL.
+3. In `frontend/.env.local`:
 
 ```
-NEXT_PUBLIC_GOOGLE_FORM_ACTION_URL=https://docs.google.com/forms/d/e/FORM_ID/formResponse
-NEXT_PUBLIC_GOOGLE_FORM_ENTRY_NAME=entry.1111111111
-NEXT_PUBLIC_GOOGLE_FORM_ENTRY_EMAIL=entry.2222222222
-# optional if you added a Message question:
-# NEXT_PUBLIC_GOOGLE_FORM_ENTRY_MESSAGE=entry.3333333333
+APPS_SCRIPT_WAITLIST_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec
 ```
 
-Rebuild / restart the frontend (`npm run build && npm run start` or `npm run dev`).  
-Until these are set, the waitlist shows a setup hint and disables submit.
-
-The browser cannot read Google’s CORS response; we POST through a hidden iframe and show an on-page success state after submit. Confirm a new row in your Form / Sheet.
+4. Rebuild / restart the frontend. Confirm `GET /api/waitlist` returns `"configured": true`.
 
 ## Known limits (Phase 1)
 

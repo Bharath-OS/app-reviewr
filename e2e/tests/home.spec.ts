@@ -157,6 +157,9 @@ test.describe("AppReviewr home (mocked API)", () => {
     ).toBeVisible();
     await expect(page.getByLabel("Name")).toBeVisible();
     await expect(page.getByLabel("Email")).toBeVisible();
+    await expect(
+      page.getByLabel(/What do you need App Store reviews for/i),
+    ).toBeVisible();
     // Native form only — no embedded Google Form iframe.
     await expect(page.locator("iframe[title*='Google Form']")).toHaveCount(0);
 

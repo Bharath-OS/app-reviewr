@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { AppStoreWaitlistForm } from "@/components/app-store-waitlist-form";
-import { getGoogleFormWaitlistConfig } from "@/lib/google-form";
 
 export const metadata: Metadata = {
   title: "App Store waitlist",
@@ -9,8 +8,6 @@ export const metadata: Metadata = {
 };
 
 export default function AppStoreWaitlistPage() {
-  const config = getGoogleFormWaitlistConfig();
-
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
       <section className="max-w-2xl space-y-4">
@@ -24,7 +21,7 @@ export default function AppStoreWaitlistPage() {
         </p>
       </section>
       <div className="mt-10">
-        <AppStoreWaitlistForm config={config} />
+        <AppStoreWaitlistForm />
       </div>
     </main>
   );

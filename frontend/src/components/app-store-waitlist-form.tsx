@@ -1,82 +1,37 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  isGoogleFormConfigured,
-  toFormResponseUrl,
-  type GoogleFormWaitlistConfig,
-} from "@/lib/google-form";
 
-/**
- * POST to Google Forms via a hidden iframe target.
- * Browser CORS blocks reading the response; the iframe submit still lands in
- * the Form / linked Sheet — the reliable client-only pattern.
- */
-function postToGoogleForm(
-  actionUrl: string,
-  fields: Record<string, string>,
-  iframeName: string,
-) {
-  let iframe = document.querySelector<HTMLIFrameElement>(
-    `iframe[name="${iframeName}"]`,
-  );
-  if (!iframe) {
-    iframe = document.createElement("iframe");
-    iframe.name = iframeName;
-    iframe.title = "Hidden Google Form target";
-    iframe.style.display = "none";
-    document.body.appendChild(iframe);
-  }
-
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = actionUrl;
-  form.target = iframeName;
-  form.acceptCharset = "UTF-8";
-  form.style.display = "none";
-
-  for (const [name, value] of Object.entries(fields)) {
-    if (!name || value === undefined) continue;
-    const input = document.createElement("input");
-    input.type = "hidden";
-    input.name = name;
-    input.value = value;
-    form.appendChild(input);
-  }
-
-  document.body.appendChild(form);
-  form.submit();
-  form.remove();
-}
-
-export function AppStoreWaitlistForm({
-  config,
-}: {
-  config: GoogleFormWaitlistConfig;
-}) {
-  const iframeName = useId().replace(/:/g, "") + "-gform";
+export function AppStoreWaitlistForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [configured, setConfigured] = useState<boolean | null>(null);
 
-  const configured = isGoogleFormConfigured(config);
-  const actionUrl = toFormResponseUrl(config.actionUrl);
-  const showMessage = Boolean(config.entryMessage);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/waitlist");
+        const data = (await res.json()) as { configured?: boolean };
+        if (!cancelled) setConfigured(Boolean(data.configured));
+      } catch {
+        if (!cancelled) setConfigured(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!configured || !actionUrl) {
-      toast.error(
-        "Waitlist is not configured. Set NEXT_PUBLIC_GOOGLE_FORM_ACTION_URL and entry IDs in .env.local.",
-      );
-      return;
-    }
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
       toast.error("Enter your email so we can reach you.");
@@ -85,28 +40,31 @@ export function AppStoreWaitlistForm({
 
     setSubmitting(true);
     setDone(false);
-
-    const fields: Record<string, string> = {
-      [config.entryName]: name.trim(),
-      [config.entryEmail]: trimmedEmail,
-      // Helps some Forms skip the confirmation interstitial.
-      submit: "Submit",
-    };
-    if (showMessage && message.trim()) {
-      fields[config.entryMessage] = message.trim();
-    }
-
     try {
-      postToGoogleForm(actionUrl, fields, iframeName);
-      // Opaque cross-origin response — treat submit as success after a beat.
-      await new Promise((r) => window.setTimeout(r, 600));
+      const res = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: trimmedEmail,
+          message: message.trim() || undefined,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+      };
+      if (!res.ok || !data.ok) {
+        toast.error(data.error || "Could not join the waitlist. Try again.");
+        return;
+      }
       setDone(true);
       setName("");
       setEmail("");
       setMessage("");
       toast.success("You're on the waitlist — thanks!");
     } catch {
-      toast.error("Something went wrong. Please try again in a moment.");
+      toast.error("Network error. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -160,45 +118,45 @@ export function AppStoreWaitlistForm({
           disabled={submitting}
         />
       </div>
-      {showMessage && (
-        <div className="space-y-2">
-          <Label htmlFor="waitlist-message">Message (optional)</Label>
-          <textarea
-            id="waitlist-message"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="What do you need App Store export for?"
-            rows={3}
-            disabled={submitting}
-            className="flex w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
-          />
-        </div>
-      )}
+      <div className="space-y-2">
+        <Label htmlFor="waitlist-need">
+          What do you need App Store reviews for?{" "}
+          <span className="font-normal text-muted-foreground">(optional)</span>
+        </Label>
+        <textarea
+          id="waitlist-need"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Competitor research, App Store Optimization, support triage…"
+          rows={3}
+          disabled={submitting}
+          className="flex w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+        />
+      </div>
       <Button
         type="submit"
         className="h-11 w-full sm:w-auto"
-        disabled={!configured || submitting}
+        disabled={submitting || configured === false}
       >
         {submitting ? "Submitting…" : "Join the waitlist"}
       </Button>
-      {!configured && (
+      {configured === false && (
         <p className="text-sm text-amber-800" role="status">
-          Set{" "}
+          Waitlist backend is not configured. Set{" "}
           <code className="rounded bg-muted px-1 py-0.5 text-xs">
-            NEXT_PUBLIC_GOOGLE_FORM_ACTION_URL
-          </code>
-          ,{" "}
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">
-            NEXT_PUBLIC_GOOGLE_FORM_ENTRY_NAME
-          </code>
-          , and{" "}
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">
-            NEXT_PUBLIC_GOOGLE_FORM_ENTRY_EMAIL
+            APPS_SCRIPT_WAITLIST_URL
           </code>{" "}
           in{" "}
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">.env.local</code>
-          , then rebuild / restart the frontend. See the README for how to find
-          entry IDs.
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            frontend/.env.local
+          </code>{" "}
+          (server-side — not{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">NEXT_PUBLIC_</code>
+          ), then restart the frontend. See{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            docs/app-store-waitlist-apps-script.md
+          </code>
+          .
         </p>
       )}
     </form>
