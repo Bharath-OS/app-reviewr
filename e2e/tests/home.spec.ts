@@ -125,8 +125,12 @@ test.describe("AppReviewr home (mocked API)", () => {
     await page.goto("/");
     await expect(page.getByRole("link", { name: "AppReviewr" }).first()).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: /Download app reviews in seconds/i }),
+      page.getByRole("heading", { name: /Export Google Play Store reviews/i }),
     ).toBeVisible();
+    // Brand lives in the nav — no duplicate eyebrow above the H1.
+    await expect(
+      page.locator("main").getByText("AppReviewr", { exact: true }),
+    ).toHaveCount(0);
 
     await page.getByLabel("App store URL").fill(
       "https://play.google.com/store/apps/details?id=com.spotify.music",
@@ -140,15 +144,20 @@ test.describe("AppReviewr home (mocked API)", () => {
     await expect(page.getByRole("link", { name: "Export CSV" })).toBeVisible();
   });
 
-  test("intent pages render", async ({ page }) => {
+  test("Play and App Store nav routes", async ({ page }) => {
     await page.goto("/export-play-store-reviews");
     await expect(
       page.getByRole("heading", { name: /Export Google Play Store reviews/i }),
     ).toBeVisible();
-    await page.goto("/download-app-store-reviews");
+
+    await page.getByRole("link", { name: "App Store" }).click();
+    await expect(page).toHaveURL(/\/app-store-waitlist/);
     await expect(
-      page.getByRole("heading", { name: /Download App Store reviews/i }),
+      page.getByRole("heading", { name: /App Store export — join the waitlist/i }),
     ).toBeVisible();
+
+    await page.goto("/download-app-store-reviews");
+    await expect(page).toHaveURL(/\/app-store-waitlist/);
   });
 
   test("from/to date inputs cannot exceed today", async ({ page }) => {

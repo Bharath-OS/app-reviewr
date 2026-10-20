@@ -8,12 +8,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     {
       url: `${base}/export-play-store-reviews`,
       changeFrequency: "monthly",
-      priority: 0.9,
+      priority: 0.8,
     },
     {
-      url: `${base}/download-app-store-reviews`,
+      url: `${base}/app-store-waitlist`,
       changeFrequency: "monthly",
-      priority: 0.8,
+      priority: 0.7,
     },
   ];
 }

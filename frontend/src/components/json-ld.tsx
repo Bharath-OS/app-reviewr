@@ -16,7 +16,7 @@ export function websiteJsonLd(siteUrl: string) {
     applicationCategory: "BusinessApplication",
     operatingSystem: "Web",
     description:
-      "Download public Google Play and App Store reviews as CSV, Excel, or JSON. Paste a link, filter, and export — no signup.",
+      "Download public Google Play reviews as CSV, Excel, or JSON. Paste a Play Store link, filter, and export — no signup.",
     offers: {
       "@type": "Offer",
       price: "0",
@@ -59,7 +59,7 @@ export function faqJsonLd() {
         name: "Are reviews cached?",
         acceptedAnswer: {
           "@type": "Answer",
-          text: "Yes. After the first fetch for an app, country, and sort order, AppReviewr caches reviews for 12 hours so repeat fetches do not re-scrape the store. Use Refresh from store to force a new scrape.",
+          text: "Yes. After the first fetch for an app, country, sort, and star filter, AppReviewr caches reviews for 12 hours so repeat fetches do not re-scrape the store. Use Refresh from store to force a new scrape.",
         },
       },
     ],

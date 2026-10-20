@@ -21,15 +21,14 @@ const siteUrl = getSiteUrl();
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "AppReviewr — Download Google Play & App Store reviews",
+    default: "AppReviewr — Export Google Play Store reviews",
     template: "%s · AppReviewr",
   },
   description:
-    "Paste a Google Play or App Store link, fetch public reviews, filter them, and download CSV, Excel, or JSON. Free, no signup.",
+    "Paste a Google Play link, fetch public reviews, filter them, and download CSV, Excel, or JSON. Free, no signup.",
   keywords: [
     "download app reviews",
     "Google Play reviews CSV",
-    "App Store reviews export",
     "export Play Store reviews",
     "app review scraper",
     "AppReviewr",
@@ -40,15 +39,15 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: siteUrl,
     siteName: "AppReviewr",
-    title: "AppReviewr — Download app store reviews",
+    title: "AppReviewr — Export Google Play Store reviews",
     description:
-      "Fetch public Google Play and App Store reviews and export CSV, Excel, or JSON in seconds.",
+      "Fetch public Google Play reviews and export CSV, Excel, or JSON in seconds.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "AppReviewr — Download app store reviews",
+    title: "AppReviewr — Export Google Play Store reviews",
     description:
-      "Paste a store link, filter public reviews, and export CSV, Excel, or JSON.",
+      "Paste a Play Store link, filter public reviews, and export CSV, Excel, or JSON.",
   },
   robots: {
     index: true,

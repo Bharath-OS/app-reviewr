@@ -345,13 +345,12 @@ export function ReviewWorkspace({
     <div className="space-y-10">
       <section className="space-y-4">
         <div>
-          <p className="text-sm font-semibold tracking-wide text-primary">AppReviewr</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-            {heading || "Download app reviews in seconds"}
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+            {heading || "Export Google Play Store reviews"}
           </h1>
           <p className="mt-3 max-w-2xl text-muted-foreground">
             {subheading ||
-              "Paste a Google Play or App Store link, filter public reviews, preview them, and export CSV, Excel, or JSON. No signup."}
+              "Paste a play.google.com link or package name, filter public reviews, and download CSV, Excel, or JSON."}
           </p>
         </div>
 
@@ -359,7 +358,7 @@ export function ReviewWorkspace({
           <Input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://play.google.com/store/apps/details?id=… or apps.apple.com/…/id…"
+            placeholder="https://play.google.com/store/apps/details?id=…"
             className="h-11 flex-1"
             aria-label="App store URL"
           />

@@ -158,8 +158,8 @@ test("capture product screenshots", async ({ page }) => {
   await page.goto("/export-play-store-reviews");
   save(await page.screenshot({ fullPage: true }), "04-intent-play.png");
 
-  await page.goto("/download-app-store-reviews");
-  save(await page.screenshot({ fullPage: true }), "05-intent-appstore.png");
+  await page.goto("/app-store-waitlist");
+  save(await page.screenshot({ fullPage: true }), "05-app-store-waitlist.png");
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");

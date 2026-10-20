@@ -1,8 +1,8 @@
 # AppReviewr
 
-Download app reviews from Google Play and the App Store in seconds.
+Export **Google Play** app reviews in seconds.
 
-Paste a store link → fetch public reviews → filter → preview → download CSV, Excel, or JSON. No signup in Phase 1.
+Paste a Play Store link → fetch public reviews → filter → preview → download CSV, Excel, or JSON. No signup in Phase 1. App Store export is on a waitlist (`/app-store-waitlist`).
 
 ## Stack
 
@@ -203,14 +203,31 @@ See [`.env.example`](.env.example). Backend vars use the `APPREVIEW_` prefix.
 
 ## Caching
 
-Reviews are cached **12 hours** per `(store, app_id, country, language, sort)`.
+Reviews are cached **12 hours** per `(store, app_id, country, language, sort, star filter)`.
 
 - First **Fetch reviews** scrapes the store and fills the cache.
-- A later Fetch for the same app/country/sort uses the cache (**no Google/Apple review scrape**).
+- A later Fetch for the same app/country/sort/**stars** uses the cache (**no Google review scrape**).
+- Different star filters use separate cache buckets (a 1★ request is not a thin slice of a mixed batch).
 - **Refresh from store** forces a new scrape (`force_refresh: true`).
 - Fresh scrapes: **10/hour per visitor IP**. Fully cached re-fetches skip that scrape quota (still 30 API calls/minute).
 
 Set `NEXT_PUBLIC_SITE_URL` to your public domain for sitemap/robots/canonical SEO.
+
+## App Store waitlist (Google Form)
+
+Nav **App Store** goes to `/app-store-waitlist`. There is no database — responses live in your Google Form / linked Sheet.
+
+1. Create a form at [Google Forms](https://forms.google.com) (e.g. Name + Email).
+2. Click **Send** → copy the form link (`…/viewform`).
+3. Put it in `frontend/.env.local` (and production env):
+
+```
+NEXT_PUBLIC_APP_STORE_WAITLIST_FORM_URL=https://docs.google.com/forms/d/e/YOUR_FORM_ID/viewform
+```
+
+4. Rebuild / restart the frontend (`npm run build && npm run start` or `npm run dev`).
+
+Until that variable is set, the waitlist page shows a setup hint and disables submit. Optional: use Google Forms → **Get pre-filled link** if you want the Name/Email fields to prefill from our UI later.
 
 ## Known limits (Phase 1)
 

@@ -8,10 +8,10 @@ export function SiteHeader() {
           AppReviewr
         </Link>
         <nav className="flex items-center gap-4 text-sm text-muted-foreground">
-          <Link href="/export-play-store-reviews" className="hover:text-foreground">
+          <Link href="/" className="hover:text-foreground">
             Play Store
           </Link>
-          <Link href="/download-app-store-reviews" className="hover:text-foreground">
+          <Link href="/app-store-waitlist" className="hover:text-foreground">
             App Store
           </Link>
         </nav>
