@@ -215,23 +215,14 @@ Set `NEXT_PUBLIC_SITE_URL` to your public domain for sitemap/robots/canonical SE
 
 ## App Store waitlist (Apps Script → Sheet)
 
-Nav **App Store** → `/app-store-waitlist`. Native form (Name, Email, optional “What do you need App Store reviews for?”) posts to **`POST /api/waitlist`**, which forwards to your **Google Apps Script** web app; the script appends a row to a Sheet. No app database.
-
-**Why Apps Script (not Google Form `formResponse`)?** Real JSON ok/error, no hidden iframe, and the deploy URL stays server-side (`APPS_SCRIPT_WAITLIST_URL`) instead of in the browser bundle.
+Nav **App Store** → `/app-store-waitlist` (coming-soon page + waitlist form). Submits to **`POST /api/waitlist`**, which forwards to your Google Apps Script web app; the script appends a row to a Sheet. No app database.
 
 Full copy-paste script + deploy steps: [`docs/app-store-waitlist-apps-script.md`](docs/app-store-waitlist-apps-script.md).
 
-Quick path:
-
-1. Create a Sheet with tab `Waitlist` and headers `Timestamp | Name | Email | Need`.
-2. **Extensions → Apps Script** → paste the script from the doc → **Deploy → Web app** (Execute as **Me**, Who has access **Anyone**) → copy the `/exec` URL.
-3. In `frontend/.env.local`:
-
-```
-APPS_SCRIPT_WAITLIST_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec
-```
-
-4. Rebuild / restart the frontend. Confirm `GET /api/waitlist` returns `"configured": true`.
+1. Sheet tab `Waitlist` with headers `Timestamp | Name | Email | Need`.
+2. **Extensions → Apps Script** → paste script from the doc → **Deploy → Web app** (Execute as **Me**, Who has access **Anyone**) → copy `/exec` URL.
+3. `frontend/.env.local`: `APPS_SCRIPT_WAITLIST_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec`
+4. Rebuild / restart frontend. Confirm `GET /api/waitlist` → `"configured": true`.
 
 ## Known limits (Phase 1)
 

@@ -1,12 +1,8 @@
 # App Store waitlist → Google Apps Script → Sheet
 
-Yes — **Apps Script → Sheet is better** than posting to a Google Form `formResponse` URL from the browser:
+Browser → `POST /api/waitlist` (Next.js) → Apps Script web app → append row to a Google Sheet.
 
-- Real JSON success/error (no hidden iframe / opaque CORS)
-- Deploy URL stays **server-side** (`APPS_SCRIPT_WAITLIST_URL`) so it is not shipped to visitors
-- Optional “why do you need this?” field is a normal column
-
-Flow: browser → `POST /api/waitlist` (Next.js) → Apps Script web app → append row to Sheet.
+The Script deploy URL stays **server-side** (`APPS_SCRIPT_WAITLIST_URL`) so it is not shipped to visitors.
 
 ## 1. Create a Google Sheet
 
@@ -69,7 +65,7 @@ function json_(obj) {
 }
 ```
 
-3. **Save** (disk icon) and name the project e.g. `AppReviewr Waitlist`.
+3. **Save** and name the project e.g. `AppReviewr Waitlist`.
 
 ## 3. Deploy as a web app
 
@@ -80,11 +76,10 @@ function json_(obj) {
    - **Execute as:** **Me**
    - **Who has access:** **Anyone**
 4. **Deploy**.
-5. Authorize the script when prompted (choose your Google account → Advanced → Go to … → Allow).
-6. Copy the **Web app URL**  
-   (`https://script.google.com/macros/s/…/exec`).
+5. Authorize when prompted.
+6. Copy the **Web app URL** (`https://script.google.com/macros/s/…/exec`).
 
-> After editing the script later: **Deploy → Manage deployments → Edit → New version → Deploy**, then keep using the same URL (or copy the new one if you created a fresh deployment).
+> After editing the script later: **Deploy → Manage deployments → Edit → New version → Deploy**.
 
 ## 4. Wire AppReviewr
 
@@ -94,30 +89,16 @@ In `frontend/.env.local` (and production host env):
 APPS_SCRIPT_WAITLIST_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec
 ```
 
-**Important:** this is a **server** env var (no `NEXT_PUBLIC_`). The Next.js route `POST /api/waitlist` reads it and forwards JSON `{ name, email, message }` so browsers never see the Script URL.
-
-Restart / rebuild the frontend:
-
-```bash
-cd frontend
-npm run build
-npm run start
-# or: npm run dev
-```
+This is a **server** env var (no `NEXT_PUBLIC_`). Restart / rebuild the frontend after setting it.
 
 ## 5. Test
 
-1. Open `/app-store-waitlist`.
-2. Submit Name + Email (+ optional need).
-3. Confirm a new row in the Sheet.
-4. `GET /api/waitlist` should return `{ "configured": true, … }`.
+1. Open `/app-store-waitlist` and submit Name + Email (+ optional need).
+2. Confirm a new row in the Sheet.
+3. `GET /api/waitlist` should return `{ "configured": true, … }`.
 
 ## Security notes
 
-- **Anyone** can call the web app URL if they obtain it — keep it server-side only.
+- Keep the web app URL server-side only.
 - The Next.js handler validates email format and field length before forwarding.
-- For higher volume, add a shared secret header checked in `doPost` and sent from `/api/waitlist`.
-
-## Deprecated (removed from UI)
-
-The older Google Form `formResponse` + `entry.*` / hidden-iframe approach is no longer used. Prefer this Apps Script path.
+- For higher volume, add a shared secret header checked in `doPost`.

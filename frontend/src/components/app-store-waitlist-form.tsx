@@ -72,18 +72,17 @@ export function AppStoreWaitlistForm() {
 
   if (done) {
     return (
-      <div
-        className="max-w-md rounded-xl border border-border bg-white p-6 shadow-sm"
-        role="status"
-      >
-        <h2 className="text-lg font-semibold text-foreground">You're on the list</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Thanks for joining. We'll email you when App Store export ships.
+      <div role="status" className="space-y-3">
+        <h3 className="text-base font-semibold text-foreground">
+          You&apos;re on the list
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          Thanks for joining. We&apos;ll email you when App Store export ships.
         </p>
         <Button
           type="button"
           variant="outline"
-          className="mt-4"
+          className="mt-1"
           onClick={() => setDone(false)}
         >
           Submit another
@@ -93,7 +92,7 @@ export function AppStoreWaitlistForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="max-w-md space-y-4">
+    <form onSubmit={onSubmit} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="waitlist-name">Name</Label>
         <Input
@@ -103,6 +102,7 @@ export function AppStoreWaitlistForm() {
           placeholder="Alex Founder"
           autoComplete="name"
           disabled={submitting}
+          className="h-11 text-base md:text-sm"
         />
       </div>
       <div className="space-y-2">
@@ -116,6 +116,7 @@ export function AppStoreWaitlistForm() {
           placeholder="you@company.com"
           autoComplete="email"
           disabled={submitting}
+          className="h-11 text-base md:text-sm"
         />
       </div>
       <div className="space-y-2">
@@ -127,36 +128,27 @@ export function AppStoreWaitlistForm() {
           id="waitlist-need"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="Competitor research, App Store Optimization, support triage…"
+          placeholder="Competitor research, ASO, support triage…"
           rows={3}
           disabled={submitting}
-          className="flex w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+          className="flex min-h-[88px] w-full rounded-lg border border-input bg-transparent px-2.5 py-2.5 text-base outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 md:text-sm"
         />
       </div>
       <Button
         type="submit"
-        className="h-11 w-full sm:w-auto"
+        className="h-11 min-h-11 w-full text-base md:text-sm"
         disabled={submitting || configured === false}
       >
-        {submitting ? "Submitting…" : "Join the waitlist"}
+        {submitting ? "Submitting…" : "Notify me when it ships"}
       </Button>
       {configured === false && (
-        <p className="text-sm text-amber-800" role="status">
-          Waitlist backend is not configured. Set{" "}
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">
-            APPS_SCRIPT_WAITLIST_URL
-          </code>{" "}
-          in{" "}
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">
-            frontend/.env.local
-          </code>{" "}
-          (server-side — not{" "}
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">NEXT_PUBLIC_</code>
-          ), then restart the frontend. See{" "}
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">
-            docs/app-store-waitlist-apps-script.md
-          </code>
-          .
+        <p className="text-xs text-muted-foreground" role="status">
+          Waitlist signup is temporarily paused while we finish wiring
+          notifications. Check back soon, or use{" "}
+          <a href="/" className="font-medium text-primary underline-offset-4 hover:underline">
+            Play Store export
+          </a>{" "}
+          today.
         </p>
       )}
     </form>

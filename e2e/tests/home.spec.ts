@@ -153,15 +153,22 @@ test.describe("AppReviewr home (mocked API)", () => {
     await page.getByRole("link", { name: "App Store" }).click();
     await expect(page).toHaveURL(/\/app-store-waitlist/);
     await expect(
-      page.getByRole("heading", { name: /App Store export — join the waitlist/i }),
+      page.getByRole("heading", {
+        name: /Get App Store reviews the same way you get Play reviews/i,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /Join the waitlist/i }),
     ).toBeVisible();
     await expect(page.getByLabel("Name")).toBeVisible();
     await expect(page.getByLabel("Email")).toBeVisible();
     await expect(
       page.getByLabel(/What do you need App Store reviews for/i),
     ).toBeVisible();
-    // Native form only — no embedded Google Form iframe.
-    await expect(page.locator("iframe[title*='Google Form']")).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: /What.?s coming for App Store/i }),
+    ).toBeVisible();
+    await expect(page.locator("iframe")).toHaveCount(0);
 
     await page.goto("/download-app-store-reviews");
     await expect(page).toHaveURL(/\/app-store-waitlist/);
