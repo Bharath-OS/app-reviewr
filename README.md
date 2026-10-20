@@ -213,21 +213,56 @@ Reviews are cached **12 hours** per `(store, app_id, country, language, sort, st
 
 Set `NEXT_PUBLIC_SITE_URL` to your public domain for sitemap/robots/canonical SEO.
 
-## App Store waitlist (Google Form)
+## App Store waitlist (Google Form → Sheet)
 
-Nav **App Store** goes to `/app-store-waitlist`. There is no database — responses live in your Google Form / linked Sheet.
+Nav **App Store** goes to `/app-store-waitlist`. The page shows a **native** Name / Email form (no embedded Google Form). Submit POSTs into your Google Form’s `formResponse` endpoint, so rows appear in the Form responses / linked Sheet. No app database.
 
-1. Create a form at [Google Forms](https://forms.google.com) (e.g. Name + Email).
-2. Click **Send** → copy the form link (`…/viewform`).
-3. Put it in `frontend/.env.local` (and production env):
+### 1. Create the Form
+
+1. Open [Google Forms](https://forms.google.com).
+2. Add questions: **Name** (short answer), **Email** (short answer), optional **Message**.
+3. (Optional) Responses → Link to Sheets.
+
+### 2. Get the action URL
+
+The submit URL is:
 
 ```
-NEXT_PUBLIC_APP_STORE_WAITLIST_FORM_URL=https://docs.google.com/forms/d/e/YOUR_FORM_ID/viewform
+https://docs.google.com/forms/d/e/FORM_ID/formResponse
 ```
 
-4. Rebuild / restart the frontend (`npm run build && npm run start` or `npm run dev`).
+`FORM_ID` is the same id as in your normal share link (`…/forms/d/e/FORM_ID/viewform`). Replace `viewform` with `formResponse`.
 
-Until that variable is set, the waitlist page shows a setup hint and disables submit. Optional: use Google Forms → **Get pre-filled link** if you want the Name/Email fields to prefill from our UI later.
+### 3. Get `entry.xxxxx` field IDs
+
+**Prefill link (easiest):**
+
+1. Form menu **⋮** → **Get pre-filled link**.
+2. Type sample values → **Get link** → copy the URL.
+3. From the URL, copy each `entry.1234567890` (Name → `NEXT_PUBLIC_GOOGLE_FORM_ENTRY_NAME`, Email → `…_ENTRY_EMAIL`).
+
+**Or Inspect:**
+
+1. Open the live form (`viewform`).
+2. Right-click the Name input → **Inspect**.
+3. Find `name="entry.XXXXXXXX"` on the `<input>` / `<textarea>`.
+
+### 4. Configure env and restart
+
+In `frontend/.env.local` (and production):
+
+```
+NEXT_PUBLIC_GOOGLE_FORM_ACTION_URL=https://docs.google.com/forms/d/e/FORM_ID/formResponse
+NEXT_PUBLIC_GOOGLE_FORM_ENTRY_NAME=entry.1111111111
+NEXT_PUBLIC_GOOGLE_FORM_ENTRY_EMAIL=entry.2222222222
+# optional if you added a Message question:
+# NEXT_PUBLIC_GOOGLE_FORM_ENTRY_MESSAGE=entry.3333333333
+```
+
+Rebuild / restart the frontend (`npm run build && npm run start` or `npm run dev`).  
+Until these are set, the waitlist shows a setup hint and disables submit.
+
+The browser cannot read Google’s CORS response; we POST through a hidden iframe and show an on-page success state after submit. Confirm a new row in your Form / Sheet.
 
 ## Known limits (Phase 1)
 

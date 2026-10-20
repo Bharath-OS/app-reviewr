@@ -155,6 +155,10 @@ test.describe("AppReviewr home (mocked API)", () => {
     await expect(
       page.getByRole("heading", { name: /App Store export — join the waitlist/i }),
     ).toBeVisible();
+    await expect(page.getByLabel("Name")).toBeVisible();
+    await expect(page.getByLabel("Email")).toBeVisible();
+    // Native form only — no embedded Google Form iframe.
+    await expect(page.locator("iframe[title*='Google Form']")).toHaveCount(0);
 
     await page.goto("/download-app-store-reviews");
     await expect(page).toHaveURL(/\/app-store-waitlist/);
