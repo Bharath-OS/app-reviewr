@@ -18,7 +18,7 @@ Paste a store link → fetch public reviews → filter → preview → download 
 ### Prerequisites
 
 - Node.js 20+
-- Python 3.11+
+- **Python 3.11 or 3.12 only** (3.13+ / 3.15 are not supported — wheels like PyYAML often fail to build without MSVC on Windows)
 - Optional: Docker Compose
 
 ### 1. Clone
@@ -32,37 +32,62 @@ cp .env.example .env
 
 ### 2. Backend
 
-**macOS / Linux**
+**macOS / Linux** (Python 3.11 or 3.12)
 
 ```bash
 cd backend
-python3 -m venv .venv
+python3.12 -m venv .venv   # or: python3.11 -m venv .venv
 source .venv/bin/activate
+pip install --upgrade pip
 pip install -r requirements-dev.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8741
 ```
 
-**Windows (Command Prompt)**
+**Windows — install Python 3.12 first**
 
-On Windows, use `python` (not `python3`) and `Scripts\activate` (not `source …/bin/activate`):
+Do **not** use Python 3.15 / 3.13 from the Microsoft Store for this project. Install [Python 3.12](https://www.python.org/downloads/release/python-31210/) (or 3.11), and during setup check **“Add python.exe to PATH”**.
+
+Confirm the version (must start with `3.11` or `3.12`):
+
+```bat
+py -3.12 --version
+```
+
+If that fails, try `py -3.11 --version`. Avoid plain `python --version` until PATH points at 3.12 — it may still show 3.15.
+
+**Windows (Command Prompt)** — recreate the venv after installing 3.12:
 
 ```bat
 cd backend
-python -m venv .venv
+rmdir /s /q .venv
+py -3.12 -m venv .venv
 .venv\Scripts\activate
+python --version
+pip install --upgrade pip
 pip install -r requirements-dev.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8741
 ```
 
-**Windows (PowerShell)** — same as above, but activate with:
+(`python --version` inside the activated venv should print 3.12.x. If `py -3.12` is missing, use `py -3.11` instead.)
+
+**Windows (PowerShell)** — same flow:
 
 ```powershell
-.venv\Scripts\Activate.ps1
+cd backend
+Remove-Item -Recurse -Force .venv -ErrorAction SilentlyContinue
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python --version
+pip install --upgrade pip
+pip install -r requirements-dev.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8741
 ```
 
-If PowerShell blocks the script, run once: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
+If PowerShell blocks activation, run once: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
 
 Leave this terminal open while the API is running.
+
+> If `pip install` fails building **PyYAML** (MSVC / “Microsoft Visual C++ 14.0 required”), you are almost always on Python 3.13+. Delete `.venv`, install 3.12, and recreate the venv with the steps above. Do not install MSVC just to force 3.15.
 
 **Open the API in a browser**
 
