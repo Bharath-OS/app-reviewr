@@ -18,7 +18,7 @@ Paste a store link → fetch public reviews → filter → preview → download 
 ### Prerequisites
 
 - Node.js 20+
-- **Python 3.11 or 3.12 only** (3.13+ / 3.15 are not supported — wheels like PyYAML often fail to build without MSVC on Windows)
+- **Python 3.12.10 or latest 3.13.x** (Windows installers). **Avoid Python 3.15** (and other Store/preview builds without wheels — `pip` may try to compile PyYAML and fail without MSVC).
 - Optional: Docker Compose
 
 ### 1. Clone
@@ -32,30 +32,40 @@ cp .env.example .env
 
 ### 2. Backend
 
-**macOS / Linux** (Python 3.11 or 3.12)
+**macOS / Linux** (Python 3.12 or 3.13)
 
 ```bash
 cd backend
-python3.12 -m venv .venv   # or: python3.11 -m venv .venv
+python3.12 -m venv .venv   # or: python3.13 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements-dev.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8741
 ```
 
-**Windows — install Python 3.12 first**
+**Windows — install a Python that has an official installer**
 
-Do **not** use Python 3.15 / 3.13 from the Microsoft Store for this project. Install [Python 3.12](https://www.python.org/downloads/release/python-31210/) (or 3.11), and during setup check **“Add python.exe to PATH”**.
+**Avoid Python 3.15** (Microsoft Store / preview). Use one of these instead:
 
-Confirm the version (must start with `3.11` or `3.12`):
+| Option | Notes |
+|---|---|
+| **Python 3.12.10** (recommended) | Last **3.12** full release with a Windows `amd64.exe` installer. Later 3.12.x security builds (e.g. 3.12.15+) are **source-only** — no Windows installer. |
+| **Latest 3.13.x** | Also fine if it ships a Windows installer from python.org. |
+
+Direct installer (3.12.10):  
+https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe  
+
+Release page: [Python 3.12.10](https://www.python.org/downloads/release/python-31210/). During setup, check **“Add python.exe to PATH”**.
+
+Confirm the version (should be `3.12.10` or `3.13.x` — **not** `3.15`):
 
 ```bat
 py -3.12 --version
 ```
 
-If that fails, try `py -3.11 --version`. Avoid plain `python --version` until PATH points at 3.12 — it may still show 3.15.
+If you installed 3.13 instead: `py -3.13 --version`. Avoid plain `python --version` until PATH is fixed — it may still show 3.15 from the Store.
 
-**Windows (Command Prompt)** — recreate the venv after installing 3.12:
+**Windows (Command Prompt)** — recreate the venv after installing 3.12.10 (or 3.13):
 
 ```bat
 cd backend
@@ -68,7 +78,7 @@ pip install -r requirements-dev.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8741
 ```
 
-(`python --version` inside the activated venv should print 3.12.x. If `py -3.12` is missing, use `py -3.11` instead.)
+(`python --version` inside the activated venv should print 3.12.10 or 3.13.x. If you installed 3.13, use `py -3.13 -m venv .venv` instead.)
 
 **Windows (PowerShell)** — same flow:
 
@@ -87,7 +97,7 @@ If PowerShell blocks activation, run once: `Set-ExecutionPolicy -Scope CurrentUs
 
 Leave this terminal open while the API is running.
 
-> If `pip install` fails building **PyYAML** (MSVC / “Microsoft Visual C++ 14.0 required”), you are almost always on Python 3.13+. Delete `.venv`, install 3.12, and recreate the venv with the steps above. Do not install MSVC just to force 3.15.
+> If `pip install` fails building **PyYAML** (MSVC / “Microsoft Visual C++ 14.0 required”), you are almost always on **Python 3.15** or another build without binary wheels. Delete `.venv`, install [3.12.10](https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe) (or a 3.13.x installer), and recreate the venv. Do not install MSVC just to force 3.15.
 
 **Open the API in a browser**
 
