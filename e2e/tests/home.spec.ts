@@ -150,7 +150,7 @@ test.describe("AppReviewr home (mocked API)", () => {
       page.getByRole("heading", { name: /Export Google Play Store reviews/i }),
     ).toBeVisible();
 
-    await page.getByRole("link", { name: "App Store" }).click();
+    await page.locator("header").getByRole("link", { name: "App Store" }).click();
     await expect(page).toHaveURL(/\/app-store-waitlist/);
     await expect(
       page.getByRole("heading", {

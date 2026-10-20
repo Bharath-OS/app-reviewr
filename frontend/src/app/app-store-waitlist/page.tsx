@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AppStoreWaitlistForm } from "@/components/app-store-waitlist-form";
+import { getSupportEmail } from "@/lib/support";
 
 export const metadata: Metadata = {
   title: "App Store review export — coming soon",
@@ -32,6 +33,8 @@ const UPCOMING = [
 ];
 
 export default function AppStoreWaitlistPage() {
+  const supportEmail = getSupportEmail();
+
   return (
     <main>
       {/* First viewport: one composition — status, H1, one sentence, form CTA */}
@@ -60,10 +63,11 @@ export default function AppStoreWaitlistPage() {
                 Join the waitlist
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Free. No spam. We&apos;ll email you when it opens.
+                Free. No spam. We&apos;ll email you when it opens. One signup
+                per browser.
               </p>
               <div className="mt-6">
-                <AppStoreWaitlistForm />
+                <AppStoreWaitlistForm supportEmail={supportEmail} />
               </div>
             </div>
           </div>

@@ -213,16 +213,23 @@ Reviews are cached **12 hours** per `(store, app_id, country, language, sort, st
 
 Set `NEXT_PUBLIC_SITE_URL` to your public domain for sitemap/robots/canonical SEO.
 
-## App Store waitlist (Apps Script → Sheet)
+## App Store waitlist (Apps Script → Sheet + thank-you email)
 
-Nav **App Store** → `/app-store-waitlist` (coming-soon page + waitlist form). Submits to **`POST /api/waitlist`**, which forwards to your Google Apps Script web app; the script appends a row to a Sheet. No app database.
+Nav **App Store** → `/app-store-waitlist`. Form posts to **`POST /api/waitlist`** → Apps Script:
 
-Full copy-paste script + deploy steps: [`docs/app-store-waitlist-apps-script.md`](docs/app-store-waitlist-apps-script.md).
+- New email → Sheet row + thank-you email (`GmailApp`)
+- Duplicate email → `{ already: true }`, no second row
+- Browser stores a joined flag (`localStorage`) so the form is replaced by a thank-you state
 
-1. Sheet tab `Waitlist` with headers `Timestamp | Name | Email | Need`.
-2. **Extensions → Apps Script** → paste script from the doc → **Deploy → Web app** (Execute as **Me**, Who has access **Anyone**) → copy `/exec` URL.
-3. `frontend/.env.local`: `APPS_SCRIPT_WAITLIST_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec`
-4. Rebuild / restart frontend. Confirm `GET /api/waitlist` → `"configured": true`.
+Full script + deploy: [`docs/app-store-waitlist-apps-script.md`](docs/app-store-waitlist-apps-script.md).
+
+```bash
+# frontend/.env.local
+APPS_SCRIPT_WAITLIST_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec
+NEXT_PUBLIC_SUPPORT_EMAIL=hello@yourdomain.com   # footer + Suggest a feature
+```
+
+Rebuild / restart frontend after setting env. Deploying account must authorize Gmail send.
 
 ## Known limits (Phase 1)
 

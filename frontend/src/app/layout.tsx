@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
+import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { JsonLd, websiteJsonLd } from "@/components/json-ld";
 import { getSiteUrl } from "@/lib/site";
@@ -72,6 +73,7 @@ export default function RootLayout({
         <Providers>
           <SiteHeader />
           {children}
+          <SiteFooter />
         </Providers>
       </body>
     </html>

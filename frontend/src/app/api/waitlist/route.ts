@@ -78,9 +78,13 @@ export async function POST(request: Request) {
     });
 
     const text = await upstream.text();
-    let parsed: { ok?: boolean; error?: string } = {};
+    let parsed: { ok?: boolean; already?: boolean; error?: string } = {};
     try {
-      parsed = JSON.parse(text) as { ok?: boolean; error?: string };
+      parsed = JSON.parse(text) as {
+        ok?: boolean;
+        already?: boolean;
+        error?: string;
+      };
     } catch {
       // Apps Script sometimes returns HTML on misconfigured deploy.
     }
@@ -97,7 +101,10 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({
+      ok: true,
+      already: Boolean(parsed.already),
+    });
   } catch (err) {
     const detail = err instanceof Error ? err.message : "Upstream request failed";
     return NextResponse.json(
